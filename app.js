@@ -95,7 +95,7 @@ function loadReservations() {
         start: r.start,
         end: r.end,
         allDay: r.allDay || false,
-        extendedProps: { purpose: r.purpose, email: r.email }
+        extendedProps: { purpose: r.purpose, email: r.email, department: r.department }
       });
     });
     if (!calendar) {
@@ -128,6 +128,7 @@ function loadReservations() {
           const isOwner = info.event.extendedProps.email === currentUser.email;
           const isAdminUser = isAdmin(currentUser);
           let msg = `<b>예약자:</b> ${info.event.title}<br>
+<b>소속:</b> ${info.event.extendedProps.department || '미지정'}<br>
 <b>목적:</b> ${info.event.extendedProps.purpose}`;
           let actionHtml = '';
           if (isOwner || isAdminUser) {
@@ -240,6 +241,7 @@ function showEventModal(html, eventObj) {
         document.getElementById('start').value = eventObj.startStr.slice(0,16);
         document.getElementById('end').value = eventObj.endStr.slice(0,16);
         document.getElementById('name').value = eventObj.title.split(' (')[0];
+        document.getElementById('department').value = eventObj.extendedProps.department || '';
         document.getElementById('destination').value = eventObj.title.split('(')[1]?.replace(')','') || '';
         document.getElementById('purpose').value = eventObj.extendedProps.purpose;
         document.getElementById('allDay').checked = eventObj.allDay;
@@ -284,7 +286,7 @@ function setDefaultStartTime() {
 }
 
 // 반복 예약 생성 함수
-async function createRepeatReservations(start, end, name, destination, purpose, allDay, repeatType, repeatEndDate) {
+async function createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType, repeatEndDate) {
   const reservations = [];
   let currentStart = new Date(start);
   let currentEnd = new Date(end);
@@ -295,6 +297,7 @@ async function createRepeatReservations(start, end, name, destination, purpose, 
       start: currentStart.toISOString(),
       end: currentEnd.toISOString(),
       name,
+      department,
       destination,
       purpose,
       email: currentUser.email,
@@ -305,6 +308,10 @@ async function createRepeatReservations(start, end, name, destination, purpose, 
     
     // 다음 날짜 계산
     switch (repeatType) {
+      case 'daily':
+        currentStart.setDate(currentStart.getDate() + 1);
+        currentEnd.setDate(currentEnd.getDate() + 1);
+        break;
       case 'weekly':
         currentStart.setDate(currentStart.getDate() + 7);
         currentEnd.setDate(currentEnd.getDate() + 7);
@@ -316,6 +323,10 @@ async function createRepeatReservations(start, end, name, destination, purpose, 
       case 'monthly':
         currentStart.setMonth(currentStart.getMonth() + 1);
         currentEnd.setMonth(currentEnd.getMonth() + 1);
+        break;
+      case 'yearly':
+        currentStart.setFullYear(currentStart.getFullYear() + 1);
+        currentEnd.setFullYear(currentEnd.getFullYear() + 1);
         break;
     }
   }
@@ -361,15 +372,32 @@ function updateStatistics() {
     // 총 예약 수
     document.getElementById('totalReservations').textContent = reservations.length;
     
-    // 이번 달 예약 수
+    // 현재 날짜 기준
     const now = new Date();
-    const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    const monthlyReservations = reservations.filter(r => {
+    const currentMonth = now.getMonth();
+    const currentDate = now.getDate();
+    
+    // 이번 년도 예약 수
+    const yearlyReservations = reservations.filter(r => {
       const reservationDate = new Date(r.start);
-      return reservationDate.getMonth() === currentMonth && reservationDate.getFullYear() === currentYear;
+      return reservationDate.getFullYear() === currentYear;
+    });
+    document.getElementById('yearlyReservations').textContent = yearlyReservations.length;
+    
+    // 이번 달 예약 수
+    const monthlyReservations = yearlyReservations.filter(r => {
+      const reservationDate = new Date(r.start);
+      return reservationDate.getMonth() === currentMonth;
     });
     document.getElementById('monthlyReservations').textContent = monthlyReservations.length;
+    
+    // 오늘 예약 수
+    const todayReservations = monthlyReservations.filter(r => {
+      const reservationDate = new Date(r.start);
+      return reservationDate.getDate() === currentDate;
+    });
+    document.getElementById('todayReservations').textContent = todayReservations.length;
     
     // 사용자별 통계
     const userStats = {};
@@ -391,6 +419,27 @@ function updateStatistics() {
     });
     userStatsHtml += '</div>';
     document.getElementById('userStats').innerHTML = userStatsHtml;
+    
+    // 소속별 통계
+    const departmentStats = {};
+    reservations.forEach(r => {
+      const department = r.department || '미지정';
+      departmentStats[department] = (departmentStats[department] || 0) + 1;
+    });
+    
+    let departmentStatsHtml = '<div class="row g-2">';
+    Object.entries(departmentStats).forEach(([department, count]) => {
+      departmentStatsHtml += `
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+            <span class="text-truncate">${department}</span>
+            <span class="badge bg-info">${count}</span>
+          </div>
+        </div>
+      `;
+    });
+    departmentStatsHtml += '</div>';
+    document.getElementById('departmentStats').innerHTML = departmentStatsHtml;
     
     // 목적지별 통계
     const destinationStats = {};
@@ -533,6 +582,7 @@ document.getElementById('reservationForm').addEventListener('submit', async func
   const start = document.getElementById('start').value;
   const end = document.getElementById('end').value;
   const name = document.getElementById('name').value;
+  const department = document.getElementById('department').value;
   const destination = document.getElementById('destination').value;
   const purpose = document.getElementById('purpose').value;
   const allDay = document.getElementById('allDay').checked;
@@ -549,7 +599,7 @@ document.getElementById('reservationForm').addEventListener('submit', async func
     if (editEventId) {
       // 수정 (반복 예약은 수정 불가)
       await db.collection('reservations').doc(editEventId).update({
-        start, end, name, destination, purpose, email: currentUser.email, allDay
+        start, end, name, department, destination, purpose, email: currentUser.email, allDay
       });
       editEventId = null;
       document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
@@ -557,7 +607,7 @@ document.getElementById('reservationForm').addEventListener('submit', async func
       // 신규 예약
       if (isRepeat) {
         // 반복 예약 생성
-        const success = await createRepeatReservations(start, end, name, destination, purpose, allDay, repeatType, repeatEnd);
+        const success = await createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType, repeatEnd);
         if (!success) return;
       } else {
         // 단일 예약 생성
@@ -574,7 +624,7 @@ document.getElementById('reservationForm').addEventListener('submit', async func
         }
         
         await db.collection('reservations').add({
-          start, end, name, destination, purpose, email: currentUser.email, allDay
+          start, end, name, department, destination, purpose, email: currentUser.email, allDay
         });
       }
     }
