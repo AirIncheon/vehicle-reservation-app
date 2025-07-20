@@ -4,162 +4,214 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>차량 예약 현황</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
     body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #333;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 10px;
     }
-    .container {
-      max-width: 800px;
-      padding: 20px;
+    
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
     }
+    
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .header p {
+      font-size: 11px;
+      color: #666;
+    }
+    
     .status-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 15px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      margin-bottom: 20px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      margin-bottom: 10px;
       overflow: hidden;
     }
+    
     .status-header {
-      background: linear-gradient(45deg, #1976d2, #42a5f5);
-      color: white;
-      padding: 15px 20px;
+      background: #f8f9fa;
+      padding: 8px 12px;
+      font-size: 12px;
       font-weight: 600;
-      font-size: 1.1em;
+      border-bottom: 1px solid #e0e0e0;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
     }
+    
     .status-content {
-      padding: 20px;
+      padding: 10px;
     }
+    
     .reservation-item {
       background: #f8f9fa;
-      border-radius: 8px;
-      padding: 12px 15px;
-      margin-bottom: 10px;
-      border-left: 4px solid #1976d2;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      border-left: 3px solid #007bff;
+      font-size: 11px;
     }
+    
     .reservation-item:last-child {
       margin-bottom: 0;
     }
+    
     .time-badge {
-      background: #1976d2;
+      background: #007bff;
       color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.85em;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
       font-weight: 500;
-      min-width: 60px;
+      display: inline-block;
+      margin-right: 8px;
+      min-width: 50px;
       text-align: center;
     }
+    
     .info-text {
       color: #333;
-      font-size: 0.95em;
-      line-height: 1.4;
+      font-size: 11px;
     }
+    
     .no-reservation {
-      color: #6c757d;
+      color: #999;
       font-style: italic;
       text-align: center;
-      padding: 20px;
+      padding: 15px;
+      font-size: 11px;
     }
+    
     .loading {
       text-align: center;
-      padding: 40px;
-      color: #6c757d;
+      padding: 20px;
+      color: #666;
+      font-size: 11px;
     }
-    .spinner-border-sm {
-      width: 1rem;
-      height: 1rem;
+    
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 6px;
     }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .auto-refresh {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 123, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      color: #007bff;
+      border: 1px solid rgba(0, 123, 255, 0.2);
+    }
+    
     .refresh-btn {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #1976d2;
+      bottom: 10px;
+      right: 10px;
+      background: #007bff;
       color: white;
       border: none;
       border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transition: all 0.3s ease;
+      width: 36px;
+      height: 36px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
+    
     .refresh-btn:hover {
-      background: #1565c0;
-      transform: scale(1.1);
+      background: #0056b3;
     }
-    .auto-refresh {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 0.8em;
-      color: #666;
-      backdrop-filter: blur(10px);
+    
+    .timestamp {
+      text-align: center;
+      font-size: 10px;
+      color: #999;
+      margin-top: 10px;
+      padding: 5px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="text-center mb-4">
-      <h1 style="color: white; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-        🚗 차량 예약 현황
-      </h1>
-      <p style="color: rgba(255,255,255,0.9); margin-bottom: 0;">
-        오늘과 내일의 차량 이용 일정을 확인하세요
-      </p>
-    </div>
+  <div class="header">
+    <h1>🚗 차량 예약 현황</h1>
+    <p>오늘과 내일의 차량 이용 일정</p>
+  </div>
 
-    <!-- 오늘 차량이용 일정 -->
-    <div class="status-card">
-      <div class="status-header">
-        <i class="bi bi-calendar-check"></i>
-        오늘 차량이용 일정
-      </div>
-      <div class="status-content" id="todayContent">
-        <div class="loading">
-          <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-          로딩 중...
-        </div>
+  <!-- 오늘 차량이용 일정 -->
+  <div class="status-card">
+    <div class="status-header">
+      📅 오늘 차량이용 일정
+    </div>
+    <div class="status-content" id="todayContent">
+      <div class="loading">
+        <div class="spinner"></div>
+        로딩 중...
       </div>
     </div>
+  </div>
 
-    <!-- 내일 차량예약 상태 -->
-    <div class="status-card">
-      <div class="status-header">
-        <i class="bi bi-calendar-plus"></i>
-        내일 차량예약 상태
-      </div>
-      <div class="status-content" id="tomorrowContent">
-        <div class="loading">
-          <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-          로딩 중...
-        </div>
+  <!-- 내일 차량예약 상태 -->
+  <div class="status-card">
+    <div class="status-header">
+      📅 내일 차량예약 상태
+    </div>
+    <div class="status-content" id="tomorrowContent">
+      <div class="loading">
+        <div class="spinner"></div>
+        로딩 중...
       </div>
     </div>
   </div>
 
   <!-- 자동 새로고침 표시 -->
   <div class="auto-refresh">
-    <i class="bi bi-arrow-clockwise"></i> 30초마다 자동 새로고침
+    🔄 30초마다 자동 새로고침
   </div>
 
   <!-- 수동 새로고침 버튼 -->
   <button class="refresh-btn" onclick="loadReservations()" title="새로고침">
-    <i class="bi bi-arrow-clockwise"></i>
+    🔄
   </button>
+
+  <!-- 마지막 업데이트 시간 -->
+  <div class="timestamp" id="lastUpdate">
+    마지막 업데이트: 로딩 중...
+  </div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
