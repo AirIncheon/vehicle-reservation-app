@@ -205,6 +205,9 @@ async function createRepeatReservations(start, end, name, department, destinatio
   let currentEnd = new Date(end);
   const endDate = new Date(repeatEndDate);
   
+  // 반복 그룹 ID 생성 (고유한 식별자)
+  const repeatGroupId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  
   // 첫 번째 예약 추가
   reservations.push({
     start: currentStart.toISOString(),
@@ -216,7 +219,7 @@ async function createRepeatReservations(start, end, name, department, destinatio
     email: currentUser.email,
     allDay,
     isRepeat: true,
-    repeatGroup: Date.now(),
+    repeatGroup: repeatGroupId,
     repeatType: repeatType
   });
   
@@ -256,7 +259,7 @@ async function createRepeatReservations(start, end, name, department, destinatio
       email: currentUser.email,
       allDay,
       isRepeat: true,
-      repeatGroup: Date.now(),
+      repeatGroup: repeatGroupId,
       repeatType: repeatType
     });
     
@@ -327,7 +330,8 @@ function loadReservations() {
           name: r.name,
           destination: r.destination,
           isRepeat: r.isRepeat || false,
-          repeatType: r.repeatType || null
+          repeatType: r.repeatType || null,
+          repeatGroup: r.repeatGroup || null
         }
       });
     });
@@ -492,10 +496,16 @@ function showEventModal(html, eventObj) {
     
     if (deleteBtn) {
       deleteBtn.onclick = async () => {
-        if (confirm('정말 삭제하시겠습니까?')) {
-          await db.collection('reservations').doc(eventObj.id).delete();
-          modalInstance.hide();
-          loadReservations();
+        // 반복 예약인지 확인
+        if (eventObj.extendedProps.isRepeat) {
+          showDeleteRepeatModal(eventObj, modalInstance);
+        } else {
+          // 단일 예약 삭제
+          if (confirm('정말 삭제하시겠습니까?')) {
+            await db.collection('reservations').doc(eventObj.id).delete();
+            modalInstance.hide();
+            loadReservations();
+          }
         }
       };
     }
@@ -690,6 +700,144 @@ function updateStatistics() {
     destinationStatsHtml += '</div>';
     document.getElementById('destinationStats').innerHTML = destinationStatsHtml;
   });
+}
+
+// 반복 예약 삭제 모달 표시
+function showDeleteRepeatModal(eventObj, originalModalInstance) {
+  let deleteModal = document.getElementById('deleteRepeatModal');
+  if (!deleteModal) {
+    deleteModal = document.createElement('div');
+    deleteModal.id = 'deleteRepeatModal';
+    deleteModal.innerHTML = `
+      <div class="modal fade" tabindex="-1" id="deleteRepeatModalInner">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">반복 예약 삭제</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p>반복 예약을 삭제하시겠습니까?</p>
+              <div class="d-grid gap-2">
+                <button type="button" class="btn btn-outline-warning" id="deleteThisEvent">
+                  <i class="bi bi-calendar-x"></i> 해당 일정만 삭제
+                </button>
+                <button type="button" class="btn btn-outline-danger" id="deleteFutureEvents">
+                  <i class="bi bi-calendar-minus"></i> 이후 일정 삭제
+                </button>
+                <button type="button" class="btn btn-danger" id="deleteAllEvents">
+                  <i class="bi bi-calendar-dash"></i> 모든 일정 삭제
+                </button>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(deleteModal);
+  }
+  
+  const deleteModalInstance = new bootstrap.Modal(document.getElementById('deleteRepeatModalInner'));
+  deleteModalInstance.show();
+  
+  // 원본 모달 숨기기
+  originalModalInstance.hide();
+  
+  // 삭제 버튼 이벤트 연결
+  setTimeout(() => {
+    const deleteThisBtn = document.getElementById('deleteThisEvent');
+    const deleteFutureBtn = document.getElementById('deleteFutureEvents');
+    const deleteAllBtn = document.getElementById('deleteAllEvents');
+    
+    if (deleteThisBtn) {
+      deleteThisBtn.onclick = async () => {
+        await deleteRepeatEvent(eventObj, 'this');
+        deleteModalInstance.hide();
+        loadReservations();
+      };
+    }
+    
+    if (deleteFutureBtn) {
+      deleteFutureBtn.onclick = async () => {
+        await deleteRepeatEvent(eventObj, 'future');
+        deleteModalInstance.hide();
+        loadReservations();
+      };
+    }
+    
+    if (deleteAllBtn) {
+      deleteAllBtn.onclick = async () => {
+        await deleteRepeatEvent(eventObj, 'all');
+        deleteModalInstance.hide();
+        loadReservations();
+      };
+    }
+  }, 100);
+}
+
+// 반복 예약 삭제 처리
+async function deleteRepeatEvent(eventObj, deleteType) {
+  try {
+    const eventDate = new Date(eventObj.start);
+    const repeatGroup = eventObj.extendedProps.repeatGroup;
+    
+    if (!repeatGroup) {
+      // repeatGroup이 없으면 해당 예약만 삭제
+      await db.collection('reservations').doc(eventObj.id).delete();
+      return;
+    }
+    
+    // 같은 반복 그룹의 모든 예약 조회
+    const snapshot = await db.collection('reservations')
+      .where('repeatGroup', '==', repeatGroup)
+      .get();
+    
+    const batch = db.batch();
+    
+    snapshot.forEach(doc => {
+      const reservation = doc.data();
+      const reservationDate = new Date(reservation.start);
+      
+      let shouldDelete = false;
+      
+      switch (deleteType) {
+        case 'this':
+          // 해당 일정만 삭제
+          shouldDelete = doc.id === eventObj.id;
+          break;
+        case 'future':
+          // 이후 일정 삭제 (해당 날짜 포함)
+          shouldDelete = reservationDate >= eventDate;
+          break;
+        case 'all':
+          // 모든 일정 삭제
+          shouldDelete = true;
+          break;
+      }
+      
+      if (shouldDelete) {
+        batch.delete(doc.ref);
+      }
+    });
+    
+    await batch.commit();
+    
+    // 삭제 완료 메시지
+    const deleteTypeText = {
+      'this': '해당 일정',
+      'future': '이후 일정',
+      'all': '모든 일정'
+    }[deleteType];
+    
+    alert(`${deleteTypeText}이 성공적으로 삭제되었습니다.`);
+    
+  } catch (error) {
+    console.error('Delete repeat event error:', error);
+    alert('삭제 중 오류가 발생했습니다.');
+  }
 }
 
 // 알림 표시
