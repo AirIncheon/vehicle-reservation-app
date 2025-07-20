@@ -292,10 +292,58 @@ async function createRepeatReservations(start, end, name, department, destinatio
   let currentEnd = new Date(end);
   const endDate = new Date(repeatEndDate);
   
-  while (currentStart <= endDate) {
+  // 첫 번째 예약 추가
+  reservations.push({
+    start: currentStart.toISOString(),
+    end: currentEnd.toISOString(),
+    name,
+    department,
+    destination,
+    purpose,
+    email: currentUser.email,
+    allDay,
+    isRepeat: true,
+    repeatGroup: Date.now() // 반복 그룹 식별자
+  });
+  
+  // 반복 예약 생성
+  while (true) {
+    // 다음 날짜 계산 (새로운 Date 객체 생성)
+    let nextStart = new Date(currentStart);
+    let nextEnd = new Date(currentEnd);
+    
+    switch (repeatType) {
+      case 'daily':
+        nextStart.setDate(nextStart.getDate() + 1);
+        nextEnd.setDate(nextEnd.getDate() + 1);
+        break;
+      case 'weekly':
+        nextStart.setDate(nextStart.getDate() + 7);
+        nextEnd.setDate(nextEnd.getDate() + 7);
+        break;
+      case 'biweekly':
+        nextStart.setDate(nextStart.getDate() + 14);
+        nextEnd.setDate(nextEnd.getDate() + 14);
+        break;
+      case 'monthly':
+        nextStart.setMonth(nextStart.getMonth() + 1);
+        nextEnd.setMonth(nextEnd.getMonth() + 1);
+        break;
+      case 'yearly':
+        nextStart.setFullYear(nextStart.getFullYear() + 1);
+        nextEnd.setFullYear(nextEnd.getFullYear() + 1);
+        break;
+    }
+    
+    // 종료일을 넘으면 중단
+    if (nextStart > endDate) {
+      break;
+    }
+    
+    // 예약 추가
     reservations.push({
-      start: currentStart.toISOString(),
-      end: currentEnd.toISOString(),
+      start: nextStart.toISOString(),
+      end: nextEnd.toISOString(),
       name,
       department,
       destination,
@@ -306,29 +354,9 @@ async function createRepeatReservations(start, end, name, department, destinatio
       repeatGroup: Date.now() // 반복 그룹 식별자
     });
     
-    // 다음 날짜 계산
-    switch (repeatType) {
-      case 'daily':
-        currentStart.setDate(currentStart.getDate() + 1);
-        currentEnd.setDate(currentEnd.getDate() + 1);
-        break;
-      case 'weekly':
-        currentStart.setDate(currentStart.getDate() + 7);
-        currentEnd.setDate(currentEnd.getDate() + 7);
-        break;
-      case 'biweekly':
-        currentStart.setDate(currentStart.getDate() + 14);
-        currentEnd.setDate(currentEnd.getDate() + 14);
-        break;
-      case 'monthly':
-        currentStart.setMonth(currentStart.getMonth() + 1);
-        currentEnd.setMonth(currentEnd.getMonth() + 1);
-        break;
-      case 'yearly':
-        currentStart.setFullYear(currentStart.getFullYear() + 1);
-        currentEnd.setFullYear(currentEnd.getFullYear() + 1);
-        break;
-    }
+    // 다음 반복을 위해 현재 날짜 업데이트
+    currentStart = nextStart;
+    currentEnd = nextEnd;
   }
   
   // 중복 체크
@@ -366,8 +394,11 @@ function updateStatistics() {
   db.collection('reservations').get().then(snapshot => {
     const reservations = [];
     snapshot.forEach(doc => {
-      reservations.push(doc.data());
+      const data = doc.data();
+      reservations.push(data);
     });
+    
+    console.log('전체 예약 데이터:', reservations); // 디버깅용
     
     // 총 예약 수
     document.getElementById('totalReservations').textContent = reservations.length;
@@ -426,6 +457,8 @@ function updateStatistics() {
       const department = r.department || '미지정';
       departmentStats[department] = (departmentStats[department] || 0) + 1;
     });
+    
+    console.log('소속별 통계:', departmentStats); // 디버깅용
     
     let departmentStatsHtml = '<div class="row g-2">';
     Object.entries(departmentStats).forEach(([department, count]) => {
@@ -524,27 +557,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('stats-tab').addEventListener('click', function() {
     updateStatistics();
   });
-});
-
-// 반복 예약 관련 요소들
-const repeatCheckbox = document.getElementById('repeatReservation');
-const repeatOptions = document.getElementById('repeatOptions');
-const repeatEndDate = document.getElementById('repeatEndDate');
-const repeatEnd = document.getElementById('repeatEnd');
-
-// 반복 예약 체크박스 이벤트
-repeatCheckbox.addEventListener('change', function() {
-  if (this.checked) {
-    repeatOptions.style.display = 'block';
-    repeatEndDate.style.display = 'block';
-    // 기본 종료일을 3개월 후로 설정
-    const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
-    repeatEnd.value = defaultEndDate.toISOString().slice(0, 10);
-  } else {
-    repeatOptions.style.display = 'none';
-    repeatEndDate.style.display = 'none';
-  }
+  
+  
 });
 
 // 종일예약 체크 시 input type 변경
@@ -630,9 +644,11 @@ document.getElementById('reservationForm').addEventListener('submit', async func
     }
     
     this.reset();
-    repeatOptions.style.display = 'block';
-    repeatEndDate.style.display = 'none';
-    repeatCheckbox.checked = false;
+    document.getElementById('repeatOptions').style.display = 'none';
+    document.getElementById('repeatEndDate').style.display = 'none';
+    document.getElementById('repeatReservation').checked = false;
+    // 소속 필드 리셋
+    document.getElementById('department').value = '';
     loadReservations();
     updateDatalist('name-list', 'names');
     updateDatalist('destination-list', 'destinations');
