@@ -1304,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      // 폼 리셋
+      // 폼 리셋 및 캐시 정리
       this.reset();
       repeatOptions.style.display = 'none';
       repeatCheckbox.checked = false;
@@ -1314,6 +1314,12 @@ document.addEventListener('DOMContentLoaded', function() {
       startInput.type = 'datetime-local';
       endInput.type = 'datetime-local';
       endInput.disabled = false;
+      
+      // 입력 필드 캐시 완전 정리
+      document.getElementById('name').value = '';
+      document.getElementById('destination').value = '';
+      document.getElementById('purpose').value = '';
+      
       setDefaultStartTime();
       loadReservations();
       
