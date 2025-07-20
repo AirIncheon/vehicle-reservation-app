@@ -1079,10 +1079,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
         
         // 수정 성공 메시지
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-        const dateStr = startDate.toLocaleDateString('ko-KR');
-        const timeStr = allDay ? '종일' : `${startDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${endDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+        const modifiedStartDate = new Date(start);
+        const modifiedEndDate = new Date(end);
+        const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
+        const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
         alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
       } else {
         // 신규 예약
@@ -1105,15 +1105,15 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!success) return;
           
           // 반복 예약 성공 메시지
-          const startDate = new Date(start);
-          const endDate = new Date(end);
+          const repeatStartDate = new Date(start);
+          const repeatEndDateForMessage = new Date(end);
           const repeatTypeText = {
             'daily': '매일',
             'weekly': '매주',
             'yearly': '매년'
           }[repeatTypeValue] || repeatTypeValue;
           
-          alert(`반복 예약이 성공적으로 생성되었습니다!\n\n📅 ${startDate.toLocaleDateString('ko-KR')} ~ ${endDate.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+          alert(`반복 예약이 성공적으로 생성되었습니다!\n\n📅 ${repeatStartDate.toLocaleDateString('ko-KR')} ~ ${repeatEndDateForMessage.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
         } else {
           // 단일 예약 생성
           // 중복 체크 (더 정확한 겹침 검사)
@@ -1155,10 +1155,10 @@ document.addEventListener('DOMContentLoaded', function() {
           });
           
           // 단일 예약 성공 메시지
-          const startDate = new Date(start);
-          const endDate = new Date(end);
-          const dateStr = startDate.toLocaleDateString('ko-KR');
-          const timeStr = allDay ? '종일' : `${startDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${endDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+          const singleStartDate = new Date(start);
+          const singleEndDate = new Date(end);
+          const dateStr = singleStartDate.toLocaleDateString('ko-KR');
+          const timeStr = allDay ? '종일' : `${singleStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${singleEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
           alert(`예약이 성공적으로 등록되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
         }
       }
