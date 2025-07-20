@@ -39,13 +39,17 @@ function createReservationHTML(reservation) {
   const endTime = new Date(reservation.end);
   
   const timeRange = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-  const purpose = reservation.title || '목적 미정';
-  const user = reservation.userName || reservation.userEmail || '사용자 미정';
+  const purpose = reservation.purpose || reservation.title || '목적 미정';
+  const user = reservation.name || reservation.userName || reservation.userEmail || '사용자 미정';
+  const destination = reservation.destination || '';
+  
+  // 목적지가 있으면 표시
+  const displayText = destination ? `${purpose} (${user} - ${destination})` : `${purpose} (${user})`;
   
   return `
     <div class="reservation-item">
       <span class="time-badge">${timeRange}</span>
-      <span class="info-text">${purpose} (${user})</span>
+      <span class="info-text">${displayText}</span>
     </div>
   `;
 }
