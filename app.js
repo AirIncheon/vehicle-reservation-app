@@ -154,6 +154,13 @@ function loadReservations() {
           const allDayCheckbox = document.getElementById('allDay');
           const startInput = document.getElementById('start');
           const endInput = document.getElementById('end');
+          
+          // DOM 요소 존재 확인
+          if (!allDayCheckbox || !startInput || !endInput) {
+            console.warn('DOM 요소를 찾을 수 없습니다.');
+            return;
+          }
+          
           if (allDayCheckbox.checked) {
             // 종일 예약: date 타입
             startInput.type = 'date';
@@ -253,6 +260,12 @@ function showEventModal(html, eventObj) {
         const startInput = document.getElementById('start');
         const endInput = document.getElementById('end');
         
+        // DOM 요소 존재 확인
+        if (!allDayCheckbox || !startInput || !endInput) {
+          console.warn('DOM 요소를 찾을 수 없습니다.');
+          return;
+        }
+        
         // 종일 예약 체크박스 설정
         allDayCheckbox.checked = isAllDay;
         
@@ -312,9 +325,16 @@ function showEventModal(html, eventObj) {
 
 // 예약 시작 기본값 설정 함수
 function setDefaultStartTime() {
-  const now = new Date();
   const startInput = document.getElementById('start');
   const endInput = document.getElementById('end');
+  
+  // DOM 요소 존재 확인
+  if (!startInput || !endInput) {
+    console.warn('DOM 요소를 찾을 수 없습니다.');
+    return;
+  }
+  
+  const now = new Date();
   let startDate;
   if (now.getHours() < 12) {
     // 오전: 오늘 현재시간
