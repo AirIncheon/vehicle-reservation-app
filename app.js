@@ -231,29 +231,41 @@ async function createRepeatReservations(start, end, name, department, destinatio
     currentEnd = nextEnd;
   }
   
-  // 중복 체크
+  // 중복 체크 (더 정확한 겹침 검사)
   const snapshot = await db.collection('reservations').get();
   const conflicts = [];
   
   for (const reservation of reservations) {
+    const reservationStart = new Date(reservation.start);
+    const reservationEnd = new Date(reservation.end);
+    
     const hasConflict = snapshot.docs.some(doc => {
       const r = doc.data();
-      const reservationStart = new Date(reservation.start);
-      const reservationEnd = new Date(reservation.end);
       const existingStart = new Date(r.start);
       const existingEnd = new Date(r.end);
       
-      return (reservationStart < existingEnd && reservationEnd > existingStart && (allDay === !!r.allDay));
+      // 시간 겹침 검사 (시작일이 다른 예약의 종료일보다 이전이고, 종료일이 다른 예약의 시작일보다 이후)
+      const timeOverlap = reservationStart < existingEnd && reservationEnd > existingStart;
+      
+      // 종일 예약과 시간 예약은 겹치지 않음
+      const allDayConflict = allDay === !!r.allDay;
+      
+      return timeOverlap && allDayConflict;
     });
     
     if (hasConflict) {
-      conflicts.push(new Date(reservation.start).toLocaleDateString('ko-KR'));
+      const conflictDate = new Date(reservation.start);
+      const dateStr = conflictDate.toLocaleDateString('ko-KR');
+      const timeStr = allDay ? '종일' : `${formatTime(conflictDate)} ~ ${formatTime(reservationEnd)}`;
+      conflicts.push(`${dateStr} ${timeStr}`);
     }
   }
   
   if (conflicts.length > 0) {
-    alert(`다음 날짜에 이미 예약이 존재합니다:\n${conflicts.join('\n')}`);
-    return false;
+    const conflictMessage = `다음 일정과 겹치는 예약이 존재합니다:\n\n${conflicts.join('\n')}\n\n예약을 취소하시겠습니까?`;
+    if (!confirm(conflictMessage)) {
+      return false;
+    }
   }
   
   // 모든 예약 저장
@@ -664,16 +676,25 @@ function showDeleteRepeatModal(eventObj, originalModalInstance) {
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              <p>반복 예약을 삭제하시겠습니까?</p>
-              <div class="d-grid gap-2">
-                <button type="button" class="btn btn-outline-warning" id="deleteThisEvent">
-                  <i class="bi bi-calendar-x"></i> 해당 일정만 삭제
+              <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                <strong>${eventObj.extendedProps.name}</strong>님의 반복 예약을 삭제하시겠습니까?
+              </div>
+              <div class="d-grid gap-3">
+                <button type="button" class="btn btn-outline-warning btn-lg" id="deleteThisEvent">
+                  <i class="bi bi-calendar-x me-2"></i>
+                  <div><strong>해당 일정만 삭제</strong></div>
+                  <small class="text-muted">선택한 날짜의 예약만 삭제됩니다</small>
                 </button>
-                <button type="button" class="btn btn-outline-danger" id="deleteFutureEvents">
-                  <i class="bi bi-calendar-minus"></i> 이후 일정 삭제
+                <button type="button" class="btn btn-outline-danger btn-lg" id="deleteFutureEvents">
+                  <i class="bi bi-calendar-minus me-2"></i>
+                  <div><strong>이후 일정 모두 삭제</strong></div>
+                  <small class="text-muted">선택한 날짜부터 미래의 모든 반복 예약이 삭제됩니다</small>
                 </button>
-                <button type="button" class="btn btn-danger" id="deleteAllEvents">
-                  <i class="bi bi-calendar-dash"></i> 모든 일정 삭제
+                <button type="button" class="btn btn-danger btn-lg" id="deleteAllEvents">
+                  <i class="bi bi-calendar-dash me-2"></i>
+                  <div><strong>전체 반복 예약 삭제</strong></div>
+                  <small class="text-muted">이 반복 예약의 모든 일정이 삭제됩니다</small>
                 </button>
               </div>
             </div>
@@ -1008,21 +1029,38 @@ document.addEventListener('DOMContentLoaded', function() {
           alert(`반복 예약이 성공적으로 생성되었습니다!\n\n📅 ${startDate.toLocaleDateString('ko-KR')} ~ ${endDate.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
         } else {
           // 단일 예약 생성
-          // 중복 체크
+          // 중복 체크 (더 정확한 겹침 검사)
           const snapshot = await db.collection('reservations').get();
-          const hasConflict = snapshot.docs.some(doc => {
+          const conflicts = [];
+          
+          const reservationStart = new Date(start);
+          const reservationEnd = new Date(end);
+          
+          snapshot.docs.forEach(doc => {
             const r = doc.data();
-            const reservationStart = new Date(start);
-            const reservationEnd = new Date(end);
             const existingStart = new Date(r.start);
             const existingEnd = new Date(r.end);
             
-            return (reservationStart < existingEnd && reservationEnd > existingStart && (allDay === !!r.allDay));
+            // 시간 겹침 검사
+            const timeOverlap = reservationStart < existingEnd && reservationEnd > existingStart;
+            
+            // 종일 예약과 시간 예약은 겹치지 않음
+            const allDayConflict = allDay === !!r.allDay;
+            
+            if (timeOverlap && allDayConflict) {
+              const conflictDate = new Date(r.start);
+              const dateStr = conflictDate.toLocaleDateString('ko-KR');
+              const timeStr = r.allDay ? '종일' : `${formatTime(existingStart)} ~ ${formatTime(existingEnd)}`;
+              const conflictInfo = `${dateStr} ${timeStr} (${r.name}님)`;
+              conflicts.push(conflictInfo);
+            }
           });
           
-          if (hasConflict) {
-            alert('이미 해당 시간에 예약이 존재합니다!');
-            return;
+          if (conflicts.length > 0) {
+            const conflictMessage = `다음 일정과 겹치는 예약이 존재합니다:\n\n${conflicts.join('\n')}\n\n예약을 취소하시겠습니까?`;
+            if (!confirm(conflictMessage)) {
+              return;
+            }
           }
           
           await db.collection('reservations').add({
