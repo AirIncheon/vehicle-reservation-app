@@ -16,6 +16,19 @@ let calendar = null;
 let editEventId = null;
 const ADMIN_EMAIL = 'safety7033@gmail.com';
 
+// DOM 요소들을 전역 변수로 관리
+let allDayCheckbox = null;
+let startInput = null;
+let endInput = null;
+let repeatCheckbox = null;
+let repeatOptions = null;
+let repeatEndDate = null;
+let repeatEnd = null;
+let reservationForm = null;
+let loginBtn = null;
+let logoutBtn = null;
+let statsTab = null;
+
 // Firebase 연결 상태 확인 함수
 function checkFirebaseConnection() {
   return new Promise((resolve, reject) => {
@@ -151,9 +164,6 @@ function loadReservations() {
         dateClick: function(info) {
           // dayCellClick과 동일하게 동작 (FullCalendar v6는 dateClick 사용)
           // 입력란에 날짜 자동 세팅
-          const allDayCheckbox = document.getElementById('allDay');
-          const startInput = document.getElementById('start');
-          const endInput = document.getElementById('end');
           
           // DOM 요소 존재 확인
           if (!allDayCheckbox || !startInput || !endInput) {
@@ -256,9 +266,6 @@ function showEventModal(html, eventObj) {
         
         // 종일 예약인지 확인
         const isAllDay = eventObj.allDay;
-        const allDayCheckbox = document.getElementById('allDay');
-        const startInput = document.getElementById('start');
-        const endInput = document.getElementById('end');
         
         // DOM 요소 존재 확인
         if (!allDayCheckbox || !startInput || !endInput) {
@@ -306,9 +313,9 @@ function showEventModal(html, eventObj) {
         document.querySelector('#reservationForm button[type="submit"]').textContent = '수정하기';
         
         // 수정 모드에서는 반복 예약 옵션 숨기기
-        document.getElementById('repeatOptions').style.display = 'none';
-        document.getElementById('repeatEndDate').style.display = 'none';
-        document.getElementById('repeatReservation').checked = false;
+        repeatOptions.style.display = 'none';
+        repeatEndDate.style.display = 'none';
+        repeatReservation.checked = false;
       };
     }
     if (deleteBtn) {
@@ -325,8 +332,6 @@ function showEventModal(html, eventObj) {
 
 // 예약 시작 기본값 설정 함수
 function setDefaultStartTime() {
-  const startInput = document.getElementById('start');
-  const endInput = document.getElementById('end');
   
   // DOM 요소 존재 확인
   if (!startInput || !endInput) {
@@ -662,8 +667,8 @@ function checkReservationNotifications() {
 
 document.addEventListener('DOMContentLoaded', function() {
   // 로그인/로그아웃 UI 처리
-  const loginBtn = document.getElementById('login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
+  loginBtn = document.getElementById('login-btn');
+  logoutBtn = document.getElementById('logout-btn');
   
   loginBtn.onclick = () => {
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -677,15 +682,16 @@ document.addEventListener('DOMContentLoaded', function() {
   setDefaultStartTime();
   
   // 통계 탭 클릭 이벤트
-  document.getElementById('stats-tab').addEventListener('click', function() {
+  statsTab = document.getElementById('stats-tab');
+  statsTab.addEventListener('click', function() {
     updateStatistics();
   });
   
   // 반복 예약 관련 요소들
-  const repeatCheckbox = document.getElementById('repeatReservation');
-  const repeatOptions = document.getElementById('repeatOptions');
-  const repeatEndDate = document.getElementById('repeatEndDate');
-  const repeatEnd = document.getElementById('repeatEnd');
+  repeatCheckbox = document.getElementById('repeatReservation');
+  repeatOptions = document.getElementById('repeatOptions');
+  repeatEndDate = document.getElementById('repeatEndDate');
+  repeatEnd = document.getElementById('repeatEnd');
   
   // 반복 예약 체크박스 이벤트
   repeatCheckbox.addEventListener('change', function() {
@@ -703,9 +709,9 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // 종일예약 체크 시 input type 변경
-  const allDayCheckbox = document.getElementById('allDay');
-  const startInput = document.getElementById('start');
-  const endInput = document.getElementById('end');
+  allDayCheckbox = document.getElementById('allDay');
+  startInput = document.getElementById('start');
+  endInput = document.getElementById('end');
   
   allDayCheckbox.addEventListener('change', function() {
     if (this.checked) {
@@ -730,7 +736,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   startInput.addEventListener('change', function() {
-    const allDayCheckbox = document.getElementById('allDay');
     if (allDayCheckbox && allDayCheckbox.checked) {
       try {
         const startDate = new Date(startInput.value);
@@ -750,7 +755,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // 예약 폼 제출 처리 (중복 체크 포함)
-  document.getElementById('reservationForm').addEventListener('submit', async function(e) {
+  reservationForm = document.getElementById('reservationForm');
+  reservationForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     const start = document.getElementById('start').value;
     const end = document.getElementById('end').value;
@@ -886,26 +892,16 @@ document.addEventListener('DOMContentLoaded', function() {
       // 폼 리셋 및 UI 상태 초기화 (최적화된 버전)
       this.reset();
       
-      // DOM 요소들을 한 번에 가져와서 처리
-      const repeatOptions = document.getElementById('repeatOptions');
-      const repeatEndDate = document.getElementById('repeatEndDate');
-      const repeatReservation = document.getElementById('repeatReservation');
-      const allDayCheckbox = document.getElementById('allDay');
-      const departmentField = document.getElementById('department');
-      const startInput = document.getElementById('start');
-      const endInput = document.getElementById('end');
-      const submitButton = document.querySelector('#reservationForm button[type="submit"]');
-      
       // 반복 예약 관련 UI 초기화
       repeatOptions.style.display = 'none';
       repeatEndDate.style.display = 'none';
-      repeatReservation.checked = false;
+      repeatCheckbox.checked = false;
       
       // 종일 예약 체크박스 초기화
       allDayCheckbox.checked = false;
       
       // 소속 필드 리셋
-      departmentField.value = '';
+      document.getElementById('department').value = '';
       
       // input type을 datetime-local로 복원
       startInput.type = 'datetime-local';
@@ -913,7 +909,7 @@ document.addEventListener('DOMContentLoaded', function() {
       endInput.disabled = false;
       
       // 버튼 텍스트 복원
-      submitButton.textContent = '예약하기';
+      document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
       
       // 기본 시간 설정
       setDefaultStartTime();
