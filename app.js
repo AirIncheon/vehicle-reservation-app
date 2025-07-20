@@ -333,28 +333,49 @@ function loadReservations() {
     });
     
     if (!calendar) {
-      calendar = new FullCalendar.Calendar(calendarElement, {
-        initialView: 'dayGridMonth',
-        locale: 'ko',
-        headerToolbar: {
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek'
-        },
+      try {
+        calendar = new FullCalendar.Calendar(calendarElement, {
+          initialView: 'dayGridMonth',
+          locale: 'ko',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+          },
         events,
         eventContent: function(arg) {
-          const start = formatTime(arg.event.start);
-          const end = formatTime(arg.event.end);
-          const name = arg.event.extendedProps.name || '알 수 없음';
-          const destination = arg.event.extendedProps.destination || '';
-          const alldayClass = arg.event.allDay ? 'fc-allday' : 'fc-timed';
-          
-          return {
-            html: `<div class='fc-event-custom ${alldayClass}'>
-              <div style='font-size:0.85em; color:#1976d2;'>${arg.event.allDay ? '종일' : start + (end ? `~${end}` : '')}</div>
-              <div style='font-weight:bold; font-size:1em;'>${name}${destination ? ` (${destination})` : ''}</div>
-            </div>`
-          };
+          try {
+            // 안전한 시간 포맷팅
+            let startTime = '';
+            let endTime = '';
+            
+            if (arg.event.start && typeof arg.event.start.getTime === 'function') {
+              startTime = formatTime(arg.event.start);
+            }
+            
+            if (arg.event.end && typeof arg.event.end.getTime === 'function') {
+              endTime = formatTime(arg.event.end);
+            }
+            
+            const name = arg.event.extendedProps?.name || '알 수 없음';
+            const destination = arg.event.extendedProps?.destination || '';
+            const alldayClass = arg.event.allDay ? 'fc-allday' : 'fc-timed';
+            
+            return {
+              html: `<div class='fc-event-custom ${alldayClass}'>
+                <div style='font-size:0.85em; color:#1976d2;'>${arg.event.allDay ? '종일' : startTime + (endTime ? `~${endTime}` : '')}</div>
+                <div style='font-weight:bold; font-size:1em;'>${name}${destination ? ` (${destination})` : ''}</div>
+              </div>`
+            };
+          } catch (error) {
+            console.warn('Event content rendering error:', error);
+            return {
+              html: `<div class='fc-event-custom fc-timed'>
+                <div style='font-size:0.85em; color:#1976d2;'>시간 정보 없음</div>
+                <div style='font-weight:bold; font-size:1em;'>예약 정보</div>
+              </div>`
+            };
+          }
         },
         eventClick: function(info) {
           const isOwner = info.event.extendedProps.email === currentUser.email;
@@ -414,6 +435,11 @@ function loadReservations() {
         }
       });
       calendar.render();
+      } catch (error) {
+        console.error('Calendar initialization error:', error);
+        // 캘린더 초기화 실패 시 기본 이벤트만 표시
+        calendar = null;
+      }
     } else {
       calendar.removeAllEvents();
       events.forEach(e => calendar.addEvent(e));
