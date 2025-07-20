@@ -54,6 +54,9 @@ function formatDate(date) {
 
 // 시간을 HH:mm 형식으로 변환
 function formatTime(date) {
+  if (!date || isNaN(date.getTime())) {
+    return '';
+  }
   return date.toLocaleTimeString('ko-KR', { 
     hour: '2-digit', 
     minute: '2-digit', 
@@ -300,6 +303,13 @@ async function createRepeatReservations(start, end, name, department, destinatio
 
 // 캘린더 초기화 및 예약 불러오기
 function loadReservations() {
+  // DOM 요소가 준비되지 않았으면 리턴
+  const calendarElement = document.getElementById('calendar');
+  if (!calendarElement) {
+    console.warn('Calendar element not found');
+    return;
+  }
+  
   db.collection('reservations').get().then(snapshot => {
     const events = [];
     snapshot.forEach(doc => {
@@ -323,7 +333,7 @@ function loadReservations() {
     });
     
     if (!calendar) {
-      calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+      calendar = new FullCalendar.Calendar(calendarElement, {
         initialView: 'dayGridMonth',
         locale: 'ko',
         headerToolbar: {
@@ -335,8 +345,8 @@ function loadReservations() {
         eventContent: function(arg) {
           const start = formatTime(arg.event.start);
           const end = formatTime(arg.event.end);
-          const name = arg.event.extendedProps.name;
-          const destination = arg.event.extendedProps.destination;
+          const name = arg.event.extendedProps.name || '알 수 없음';
+          const destination = arg.event.extendedProps.destination || '';
           const alldayClass = arg.event.allDay ? 'fc-allday' : 'fc-timed';
           
           return {
@@ -723,7 +733,15 @@ auth.onAuthStateChanged(user => {
     logoutBtn.style.display = '';
     document.getElementById('login-btn').style.display = 'none';
     document.getElementById('reservationForm').style.display = '';
-    loadReservations();
+    
+    // DOM이 준비된 후 캘린더 로드
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        loadReservations();
+      });
+    } else {
+      loadReservations();
+    }
     
     // 로그인 후 알림 체크
     setTimeout(() => {
