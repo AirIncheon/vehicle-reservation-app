@@ -586,9 +586,34 @@ function populateEditForm(eventObj) {
     if (repeatCheckbox) repeatCheckbox.checked = true;
     if (repeatType) repeatType.value = eventObj.extendedProps.repeatType || 'weekly';
     
-    // 반복 종료일 설정 (기본값: 예약 종료일 + 1개월)
+    // 반복 종료일 설정 (기존 반복 그룹의 마지막 예약 날짜를 찾아서 설정)
     const repeatEndDateElement = document.getElementById('repeatEndDate');
-    if (repeatEndDateElement) {
+    if (repeatEndDateElement && eventObj.extendedProps.repeatGroup) {
+      // 같은 반복 그룹의 모든 예약을 조회하여 가장 늦은 날짜를 반복 종료일로 설정
+      db.collection('reservations')
+        .where('repeatGroup', '==', eventObj.extendedProps.repeatGroup)
+        .get()
+        .then(snapshot => {
+          let latestDate = new Date(eventObj.start);
+          snapshot.forEach(doc => {
+            const reservation = doc.data();
+            const reservationDate = new Date(reservation.end);
+            if (reservationDate > latestDate) {
+              latestDate = reservationDate;
+            }
+          });
+          repeatEndDateElement.value = latestDate.toISOString().split('T')[0];
+        })
+        .catch(error => {
+          console.error('반복 종료일 조회 오류:', error);
+          // 오류 시 기본값 설정
+          const endDate = new Date(eventObj.end);
+          const defaultRepeatEnd = new Date(endDate);
+          defaultRepeatEnd.setMonth(defaultRepeatEnd.getMonth() + 1);
+          repeatEndDateElement.value = defaultRepeatEnd.toISOString().split('T')[0];
+        });
+    } else if (repeatEndDateElement) {
+      // repeatGroup이 없는 경우 기본값 설정
       const endDate = new Date(eventObj.end);
       const defaultRepeatEnd = new Date(endDate);
       defaultRepeatEnd.setMonth(defaultRepeatEnd.getMonth() + 1);
@@ -1071,10 +1096,126 @@ document.addEventListener('DOMContentLoaded', function() {
 
     try {
       if (editEventId) {
-        // 수정
-        await db.collection('reservations').doc(editEventId).update({
-          start, end, name, department, destination, purpose, email: currentUser.email, allDay
-        });
+        // 수정 - 기존 예약 정보 조회
+        const existingReservation = await db.collection('reservations').doc(editEventId).get();
+        const existingData = existingReservation.data();
+        
+        if (existingData.isRepeat && isRepeat) {
+          // 반복 예약 수정: 기존 반복 그룹 삭제 후 새로 생성
+          const repeatEndDate = document.getElementById('repeatEndDate').value;
+          if (!repeatEndDate) {
+            alert('반복 종료일을 입력해주세요.');
+            return;
+          }
+          
+          const repeatEndDateTime = new Date(repeatEndDate);
+          const startDate = new Date(start);
+          if (repeatEndDateTime < startDate) {
+            alert('반복 종료일은 예약 시작일보다 늦어야 합니다.');
+            return;
+          }
+          
+          // 기존 반복 그룹 삭제
+          if (existingData.repeatGroup) {
+            const snapshot = await db.collection('reservations')
+              .where('repeatGroup', '==', existingData.repeatGroup)
+              .get();
+            
+            const batch = db.batch();
+            snapshot.forEach(doc => {
+              batch.delete(doc.ref);
+            });
+            await batch.commit();
+          }
+          
+          // 새로운 반복 예약 생성
+          const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
+          if (!success) return;
+          
+          // 수정 성공 메시지
+          const modifiedStartDate = new Date(start);
+          const modifiedEndDate = new Date(end);
+          const repeatTypeText = {
+            'daily': '매일',
+            'weekly': '매주',
+            'yearly': '매년'
+          }[repeatTypeValue] || repeatTypeValue;
+          
+          alert(`반복 예약이 성공적으로 수정되었습니다!\n\n📅 ${modifiedStartDate.toLocaleDateString('ko-KR')} ~ ${modifiedEndDate.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+        } else if (existingData.isRepeat && !isRepeat) {
+          // 반복 예약을 단일 예약으로 변경: 기존 반복 그룹 삭제 후 단일 예약 생성
+          if (existingData.repeatGroup) {
+            const snapshot = await db.collection('reservations')
+              .where('repeatGroup', '==', existingData.repeatGroup)
+              .get();
+            
+            const batch = db.batch();
+            snapshot.forEach(doc => {
+              batch.delete(doc.ref);
+            });
+            await batch.commit();
+          }
+          
+          // 새로운 단일 예약 생성
+          await db.collection('reservations').add({
+            start, end, name, department, destination, purpose, email: currentUser.email, allDay
+          });
+          
+          // 수정 성공 메시지
+          const modifiedStartDate = new Date(start);
+          const modifiedEndDate = new Date(end);
+          const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
+          const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+          alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+        } else {
+          // 단일 예약 수정 또는 단일 예약을 반복 예약으로 변경
+          if (isRepeat) {
+            // 단일 예약을 반복 예약으로 변경
+            const repeatEndDate = document.getElementById('repeatEndDate').value;
+            if (!repeatEndDate) {
+              alert('반복 종료일을 입력해주세요.');
+              return;
+            }
+            
+            const repeatEndDateTime = new Date(repeatEndDate);
+            const startDate = new Date(start);
+            if (repeatEndDateTime < startDate) {
+              alert('반복 종료일은 예약 시작일보다 늦어야 합니다.');
+              return;
+            }
+            
+            // 기존 단일 예약 삭제
+            await db.collection('reservations').doc(editEventId).delete();
+            
+            // 새로운 반복 예약 생성
+            const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
+            if (!success) return;
+            
+            // 수정 성공 메시지
+            const modifiedStartDate = new Date(start);
+            const modifiedEndDate = new Date(end);
+            const repeatTypeText = {
+              'daily': '매일',
+              'weekly': '매주',
+              'yearly': '매년'
+            }[repeatTypeValue] || repeatTypeValue;
+            
+            alert(`반복 예약이 성공적으로 생성되었습니다!\n\n📅 ${modifiedStartDate.toLocaleDateString('ko-KR')} ~ ${modifiedEndDate.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+          } else {
+            // 단일 예약 수정
+            await db.collection('reservations').doc(editEventId).update({
+              start, end, name, department, destination, purpose, email: currentUser.email, allDay
+            });
+            
+            // 수정 성공 메시지
+            const modifiedStartDate = new Date(start);
+            const modifiedEndDate = new Date(end);
+            const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
+            const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+            alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+          }
+        }
+        
         editEventId = null;
         document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
         
