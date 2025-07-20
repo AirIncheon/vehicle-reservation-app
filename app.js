@@ -710,7 +710,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   startInput.addEventListener('change', function() {
-    if (allDayCheckbox.checked) {
+    const allDayCheckbox = document.getElementById('allDay');
+    if (allDayCheckbox && allDayCheckbox.checked) {
       try {
         const startDate = new Date(startInput.value);
         if (!isNaN(startDate.getTime())) {
