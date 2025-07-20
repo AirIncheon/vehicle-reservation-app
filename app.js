@@ -113,28 +113,26 @@ function setupAllDayCheckbox() {
   });
 }
 
-// 반복 예약 체크박스 이벤트
-function setupRepeatCheckbox() {
-  if (!repeatCheckbox || !repeatOptions || !repeatType) return;
-  
-  // 반복 종료일 필드 완전 숨기기 (혹시 남아있다면)
-  const repeatEndDateElement = document.getElementById('repeatEndDate');
-  if (repeatEndDateElement) {
-    repeatEndDateElement.style.display = 'none';
-  }
-  
-  repeatCheckbox.addEventListener('change', function() {
-    if (this.checked) {
-      repeatOptions.style.display = 'block';
-      // 반복 종료일 필드가 있다면 숨기기
-      if (repeatEndDateElement) {
-        repeatEndDateElement.style.display = 'none';
+  // 반복 예약 체크박스 이벤트
+  function setupRepeatCheckbox() {
+    if (!repeatCheckbox || !repeatOptions || !repeatType) return;
+    
+    repeatCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        repeatOptions.style.display = 'block';
+        // 반복 종료일 기본값 설정 (예약 종료일 + 1개월)
+        const repeatEndDateElement = document.getElementById('repeatEndDate');
+        if (repeatEndDateElement && endInput && endInput.value) {
+          const endDate = new Date(endInput.value);
+          const defaultRepeatEnd = new Date(endDate);
+          defaultRepeatEnd.setMonth(defaultRepeatEnd.getMonth() + 1);
+          repeatEndDateElement.value = defaultRepeatEnd.toISOString().split('T')[0];
+        }
+      } else {
+        repeatOptions.style.display = 'none';
       }
-    } else {
-      repeatOptions.style.display = 'none';
-    }
-  });
-}
+    });
+  }
 
 // 시작 시간 변경 시 종료 시간 자동 조정
 function setupStartTimeChange() {
@@ -161,7 +159,7 @@ function setupStartTimeChange() {
 }
 
 // 반복 예약 생성
-async function createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType) {
+async function createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatType) {
   const reservations = [];
   const startDate = new Date(start);
   const endDate = new Date(end);
@@ -178,9 +176,9 @@ async function createRepeatReservations(start, end, name, department, destinatio
         return false;
       }
       
-      // 매일 반복 예약 생성 (예약 종료일까지)
+      // 매일 반복 예약 생성 (반복 종료일까지)
       let currentDate = new Date(startDate);
-      const dailyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      const dailyEndDate = new Date(repeatEndDate); // 반복 종료일 사용
       
               while (currentDate <= dailyEndDate) {
         const dayStart = new Date(currentDate);
@@ -223,7 +221,7 @@ async function createRepeatReservations(start, end, name, department, destinatio
       }
       
       let currentWeekStart = new Date(startDate);
-      const weeklyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      const weeklyEndDate = new Date(repeatEndDate); // 반복 종료일 사용
       
               while (currentWeekStart <= weeklyEndDate) {
         // 해당 주의 시작일 (같은 요일)
@@ -259,7 +257,7 @@ async function createRepeatReservations(start, end, name, department, destinatio
     case 'yearly':
       // 매년 반복: 시작일과 종료일을 그대로 유지하며 매년 반복
       let currentYearStart = new Date(startDate);
-      const yearlyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      const yearlyEndDate = new Date(repeatEndDate); // 반복 종료일 사용
       
               while (currentYearStart <= yearlyEndDate) {
         const yearStart = new Date(currentYearStart);
@@ -588,10 +586,13 @@ function populateEditForm(eventObj) {
     if (repeatCheckbox) repeatCheckbox.checked = true;
     if (repeatType) repeatType.value = eventObj.extendedProps.repeatType || 'weekly';
     
-    // 반복 종료일 필드가 있다면 숨기기
+    // 반복 종료일 설정 (기본값: 예약 종료일 + 1개월)
     const repeatEndDateElement = document.getElementById('repeatEndDate');
     if (repeatEndDateElement) {
-      repeatEndDateElement.style.display = 'none';
+      const endDate = new Date(eventObj.end);
+      const defaultRepeatEnd = new Date(endDate);
+      defaultRepeatEnd.setMonth(defaultRepeatEnd.getMonth() + 1);
+      repeatEndDateElement.value = defaultRepeatEnd.toISOString().split('T')[0];
     }
   } else {
     // 수정 모드에서는 반복 예약 옵션 숨기기
@@ -1086,8 +1087,21 @@ document.addEventListener('DOMContentLoaded', function() {
       } else {
         // 신규 예약
         if (isRepeat) {
+          // 반복 종료일 검증
+          const repeatEndDate = document.getElementById('repeatEndDate').value;
+          if (!repeatEndDate) {
+            alert('반복 종료일을 입력해주세요.');
+            return;
+          }
+          
+          const repeatEndDateTime = new Date(repeatEndDate);
+          if (repeatEndDateTime < startDate) {
+            alert('반복 종료일은 예약 시작일보다 늦어야 합니다.');
+            return;
+          }
+          
           // 반복 예약 생성
-          const success = await createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatTypeValue);
+          const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
           if (!success) return;
           
           // 반복 예약 성공 메시지
@@ -1155,6 +1169,7 @@ document.addEventListener('DOMContentLoaded', function() {
       repeatCheckbox.checked = false;
       allDayCheckbox.checked = false;
       document.getElementById('department').value = '';
+      document.getElementById('repeatEndDate').value = '';
       startInput.type = 'datetime-local';
       endInput.type = 'datetime-local';
       endInput.disabled = false;
