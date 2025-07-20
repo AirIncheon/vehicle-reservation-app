@@ -163,72 +163,127 @@ function setupStartTimeChange() {
 // 반복 예약 생성
 async function createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType) {
   const reservations = [];
-  let currentStart = new Date(start);
-  let currentEnd = new Date(end);
-  const reservationEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+  const startDate = new Date(start);
+  const endDate = new Date(end);
   
   // 반복 그룹 ID 생성 (고유한 식별자)
   const repeatGroupId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   
-  // 첫 번째 예약 추가
-  reservations.push({
-    start: currentStart.toISOString(),
-    end: currentEnd.toISOString(),
-    name,
-    department,
-    destination,
-    purpose,
-    email: currentUser.email,
-    allDay,
-    isRepeat: true,
-    repeatGroup: repeatGroupId,
-    repeatType: repeatType
-  });
-  
-  // 반복 예약 생성 (최대 100개)
-  let repeatCount = 0;
-  const maxRepeats = 100;
-  
-  while (repeatCount < maxRepeats) {
-    let nextStart = new Date(currentStart);
-    let nextEnd = new Date(currentEnd);
-    
-    switch (repeatType) {
-      case 'daily':
-        nextStart.setDate(nextStart.getDate() + 1);
-        nextEnd.setDate(nextEnd.getDate() + 1);
-        break;
-      case 'weekly':
-        // 매주 같은 요일로 설정 (정확한 7일 후)
-        nextStart.setTime(nextStart.getTime() + (7 * 24 * 60 * 60 * 1000));
-        nextEnd.setTime(nextEnd.getTime() + (7 * 24 * 60 * 60 * 1000));
-        break;
-      case 'yearly':
-        nextStart.setFullYear(nextStart.getFullYear() + 1);
-        nextEnd.setFullYear(nextEnd.getFullYear() + 1);
-        break;
-    }
-    
-    // 예약 종료일을 넘으면 중단
-    if (nextStart > reservationEndDate) break;
-    
-    reservations.push({
-      start: nextStart.toISOString(),
-      end: nextEnd.toISOString(),
-      name,
-      department,
-      destination,
-      purpose,
-      email: currentUser.email,
-      allDay,
-      isRepeat: true,
-      repeatGroup: repeatGroupId,
-      repeatType: repeatType
-    });
-    
-    repeatCount++;
-    currentStart = nextStart;
-    currentEnd = nextEnd;
+  // 반복 타입별 검증 및 로직
+  switch (repeatType) {
+    case 'daily':
+      // 매일 반복: 시작일과 종료일이 같아야 함
+      if (startDate.toDateString() !== endDate.toDateString()) {
+        alert('매일 반복 예약의 경우 시작일과 종료일이 같아야 합니다.');
+        return false;
+      }
+      
+      // 매일 반복 예약 생성 (예약 종료일까지)
+      let currentDate = new Date(startDate);
+      const dailyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      
+              while (currentDate <= dailyEndDate) {
+        const dayStart = new Date(currentDate);
+        const dayEnd = new Date(currentDate);
+        
+        // 종일 예약이 아닌 경우 원래 시간 유지
+        if (!allDay) {
+          dayStart.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
+          dayEnd.setHours(endDate.getHours(), endDate.getMinutes(), 0, 0);
+        }
+        
+        reservations.push({
+          start: dayStart.toISOString(),
+          end: dayEnd.toISOString(),
+          name,
+          department,
+          destination,
+          purpose,
+          email: currentUser.email,
+          allDay,
+          isRepeat: true,
+          repeatGroup: repeatGroupId,
+          repeatType: repeatType
+        });
+        
+        // 다음 날로 이동
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      break;
+      
+    case 'weekly':
+      // 매주 반복: 시작일의 요일을 기준으로 매주 같은 요일에 반복
+      const startDayOfWeek = startDate.getDay(); // 0=일요일, 1=월요일, ...
+      const durationDays = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000));
+      
+      // 예약 기간이 6일을 초과하면 안됨 (다음 주 같은 요일을 초과하면 안됨)
+      if (durationDays > 6) {
+        alert('매주 반복 예약의 경우 예약 기간이 6일을 초과할 수 없습니다.');
+        return false;
+      }
+      
+      let currentWeekStart = new Date(startDate);
+      const weeklyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      
+              while (currentWeekStart <= weeklyEndDate) {
+        // 해당 주의 시작일 (같은 요일)
+        const weekStart = new Date(currentWeekStart);
+        const weekEnd = new Date(currentWeekStart);
+        weekEnd.setDate(weekStart.getDate() + durationDays);
+        
+        // 종일 예약이 아닌 경우 원래 시간 유지
+        if (!allDay) {
+          weekStart.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
+          weekEnd.setHours(endDate.getHours(), endDate.getMinutes(), 0, 0);
+        }
+        
+        reservations.push({
+          start: weekStart.toISOString(),
+          end: weekEnd.toISOString(),
+          name,
+          department,
+          destination,
+          purpose,
+          email: currentUser.email,
+          allDay,
+          isRepeat: true,
+          repeatGroup: repeatGroupId,
+          repeatType: repeatType
+        });
+        
+        // 다음 주로 이동 (7일 후)
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+      }
+      break;
+      
+    case 'yearly':
+      // 매년 반복: 시작일과 종료일을 그대로 유지하며 매년 반복
+      let currentYearStart = new Date(startDate);
+      const yearlyEndDate = new Date(end); // 예약 종료일을 반복 종료일로 사용
+      
+              while (currentYearStart <= yearlyEndDate) {
+        const yearStart = new Date(currentYearStart);
+        const yearEnd = new Date(currentYearStart);
+        yearEnd.setDate(yearStart.getDate() + Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000)));
+        
+        reservations.push({
+          start: yearStart.toISOString(),
+          end: yearEnd.toISOString(),
+          name,
+          department,
+          destination,
+          purpose,
+          email: currentUser.email,
+          allDay,
+          isRepeat: true,
+          repeatGroup: repeatGroupId,
+          repeatType: repeatType
+        });
+        
+        // 다음 해로 이동
+        currentYearStart.setFullYear(currentYearStart.getFullYear() + 1);
+      }
+      break;
   }
   
   // 중복 체크 (더 정확한 겹침 검사)
@@ -983,6 +1038,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (startDate < today) {
       alert('과거 날짜는 예약할 수 없습니다.');
       return;
+    }
+    
+    // 반복 예약 추가 검증
+    if (isRepeat) {
+      if (repeatTypeValue === 'daily') {
+        // 매일 반복: 시작일과 종료일이 같아야 함
+        if (startDate.toDateString() !== endDate.toDateString()) {
+          alert('매일 반복 예약의 경우 시작일과 종료일이 같아야 합니다.');
+          return;
+        }
+      } else if (repeatTypeValue === 'weekly') {
+        // 매주 반복: 예약 기간이 6일을 초과하면 안됨
+        const durationDays = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000));
+        if (durationDays > 6) {
+          alert('매주 반복 예약의 경우 예약 기간이 6일을 초과할 수 없습니다.');
+          return;
+        }
+      }
     }
     
     // 일반 예약의 경우 시간 간격 검증 (최소 30분)
