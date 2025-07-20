@@ -8,45 +8,46 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #ffffff;
       min-height: 100vh;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #333;
     }
     .container {
-      max-width: 800px;
-      padding: 20px;
+      max-width: 500px;
+      padding: 15px;
+      margin: 0 auto;
     }
     .status-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 15px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      margin-bottom: 20px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e0e0e0;
+      margin-bottom: 15px;
       overflow: hidden;
     }
     .status-header {
-      background: linear-gradient(45deg, #1976d2, #42a5f5);
+      background: #1976d2;
       color: white;
-      padding: 15px 20px;
+      padding: 10px 15px;
       font-weight: 600;
-      font-size: 1.1em;
+      font-size: 0.9em;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .status-content {
-      padding: 20px;
+      padding: 12px 15px;
     }
     .reservation-item {
       background: #f8f9fa;
-      border-radius: 8px;
-      padding: 12px 15px;
-      margin-bottom: 10px;
-      border-left: 4px solid #1976d2;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-left: 3px solid #1976d2;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .reservation-item:last-child {
       margin-bottom: 0;
@@ -54,71 +55,74 @@
     .time-badge {
       background: #1976d2;
       color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.85em;
+      padding: 3px 6px;
+      border-radius: 3px;
+      font-size: 0.75em;
       font-weight: 500;
-      min-width: 60px;
+      min-width: 50px;
       text-align: center;
     }
     .info-text {
       color: #333;
-      font-size: 0.95em;
-      line-height: 1.4;
+      font-size: 0.85em;
+      line-height: 1.3;
     }
     .no-reservation {
       color: #6c757d;
       font-style: italic;
       text-align: center;
-      padding: 20px;
+      padding: 15px;
+      font-size: 0.85em;
     }
     .loading {
       text-align: center;
-      padding: 40px;
+      padding: 20px;
       color: #6c757d;
+      font-size: 0.85em;
     }
     .spinner-border-sm {
-      width: 1rem;
-      height: 1rem;
+      width: 0.8rem;
+      height: 0.8rem;
     }
     .refresh-btn {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: 15px;
+      right: 15px;
       background: #1976d2;
       color: white;
       border: none;
       border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      width: 40px;
+      height: 40px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.3s ease;
+      font-size: 0.9em;
     }
     .refresh-btn:hover {
       background: #1565c0;
-      transform: scale(1.1);
+      transform: scale(1.05);
     }
     .auto-refresh {
       position: fixed;
-      top: 20px;
-      right: 20px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 8px 12px;
-      border-radius: 20px;
-      font-size: 0.8em;
+      top: 15px;
+      right: 15px;
+      background: #f8f9fa;
+      padding: 6px 10px;
+      border-radius: 15px;
+      font-size: 0.7em;
       color: #666;
-      backdrop-filter: blur(10px);
+      border: 1px solid #e0e0e0;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="text-center mb-4">
-      <h1 style="color: white; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+    <div class="text-center mb-3">
+      <h1 style="color: #1976d2; font-weight: 700; font-size: 1.5em; margin-bottom: 5px;">
         🚗 차량 예약 현황
       </h1>
-      <p style="color: rgba(255,255,255,0.9); margin-bottom: 0;">
-        오늘과 내일의 차량 이용 일정을 확인하세요
+      <p style="color: #666; margin-bottom: 0; font-size: 0.85em;">
+        오늘과 내일의 차량 이용 일정
       </p>
     </div>
 
