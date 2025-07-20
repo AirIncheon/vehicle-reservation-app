@@ -16,22 +16,31 @@ let calendar = null;
 let editEventId = null;
 const ADMIN_EMAIL = 'safety7033@gmail.com';
 
+// Firebase 연결 상태 확인 함수
+function checkFirebaseConnection() {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Firebase 연결 시간 초과'));
+    }, 5000);
+    
+    db.collection('reservations').limit(1).get()
+      .then(() => {
+        clearTimeout(timeout);
+        resolve(true);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 // 관리자 권한 확인 함수
 function isAdmin(user) {
   return user && user.email === ADMIN_EMAIL;
 }
 
-// 로그인/로그아웃 UI 처리
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const userInfo = document.getElementById('user-info');
-const reservationForm = document.getElementById('reservationForm');
 
-loginBtn.onclick = () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider);
-};
-logoutBtn.onclick = () => auth.signOut();
 
 auth.onAuthStateChanged(user => {
   currentUser = user;
@@ -265,11 +274,13 @@ function showEventModal(html, eventObj) {
           startInput.type = 'datetime-local';
           endInput.type = 'datetime-local';
           
-          // 시작 시간 설정
-          startInput.value = eventObj.startStr.slice(0, 16);
+          // 시작 시간 설정 (startStr 대신 start 사용)
+          const startDate = new Date(eventObj.start);
+          startInput.value = startDate.toISOString().slice(0, 16);
           
-          // 종료 시간 설정
-          endInput.value = eventObj.endStr.slice(0, 16);
+          // 종료 시간 설정 (endStr 대신 end 사용)
+          const endDate = new Date(eventObj.end);
+          endInput.value = endDate.toISOString().slice(0, 16);
           endInput.disabled = false;
         }
         
@@ -320,14 +331,28 @@ function setDefaultStartTime() {
 
 // 반복 예약 생성 함수
 async function createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType, repeatEndDate) {
-  console.log('반복 예약 생성 시작:', { start, end, name, department, destination, purpose, allDay, repeatType, repeatEndDate });
+  // 입력값 검증
+  if (!start || !end || !name || !department || !destination || !purpose || !repeatEndDate) {
+    alert('모든 필드를 입력해주세요.');
+    return false;
+  }
+  
+  // 종료일 검증
+  const endDate = new Date(repeatEndDate);
+  if (isNaN(endDate.getTime())) {
+    alert('유효하지 않은 반복 종료일입니다.');
+    return false;
+  }
+  
+  const startDate = new Date(start);
+  if (endDate <= startDate) {
+    alert('반복 종료일은 시작일보다 늦어야 합니다.');
+    return false;
+  }
   
   const reservations = [];
   let currentStart = new Date(start);
   let currentEnd = new Date(end);
-  const endDate = new Date(repeatEndDate);
-  
-  console.log('반복 예약 설정:', { currentStart, currentEnd, endDate });
   
   // 첫 번째 예약 추가
   reservations.push({
@@ -343,11 +368,11 @@ async function createRepeatReservations(start, end, name, department, destinatio
     repeatGroup: Date.now() // 반복 그룹 식별자
   });
   
-  console.log('첫 번째 예약 추가됨:', reservations[0]);
-  
-  // 반복 예약 생성
+  // 반복 예약 생성 (최대 100개로 제한)
   let repeatCount = 0;
-  while (true) {
+  const maxRepeats = 100;
+  
+  while (repeatCount < maxRepeats) {
     // 다음 날짜 계산 (새로운 Date 객체 생성)
     let nextStart = new Date(currentStart);
     let nextEnd = new Date(currentEnd);
@@ -377,7 +402,6 @@ async function createRepeatReservations(start, end, name, department, destinatio
     
     // 종료일을 넘으면 중단
     if (nextStart > endDate) {
-      console.log('반복 종료일 도달:', nextStart, '>', endDate);
       break;
     }
     
@@ -396,14 +420,16 @@ async function createRepeatReservations(start, end, name, department, destinatio
     });
     
     repeatCount++;
-    console.log(`${repeatCount}번째 반복 예약 추가:`, nextStart.toISOString());
     
     // 다음 반복을 위해 현재 날짜 업데이트
     currentStart = nextStart;
     currentEnd = nextEnd;
   }
   
-  console.log(`총 ${reservations.length}개의 예약 생성됨`);
+  // 최대 개수 도달 시 경고
+  if (repeatCount >= maxRepeats) {
+    alert(`반복 예약이 최대 개수(${maxRepeats}개)에 도달했습니다.`);
+  }
   
   // 중복 체크
   const snapshot = await db.collection('reservations').get();
@@ -412,7 +438,13 @@ async function createRepeatReservations(start, end, name, department, destinatio
   for (const reservation of reservations) {
     const hasConflict = snapshot.docs.some(doc => {
       const r = doc.data();
-      return (reservation.start < r.end && reservation.end > r.start && (allDay === !!r.allDay));
+      const reservationStart = new Date(reservation.start);
+      const reservationEnd = new Date(reservation.end);
+      const existingStart = new Date(r.start);
+      const existingEnd = new Date(r.end);
+      
+      // 시간 겹침 체크 (Date 객체 비교)
+      return (reservationStart < existingEnd && reservationEnd > existingStart && (allDay === !!r.allDay));
     });
     if (hasConflict) {
       conflicts.push(new Date(reservation.start).toLocaleDateString('ko-KR'));
@@ -432,7 +464,6 @@ async function createRepeatReservations(start, end, name, department, destinatio
   }
   await batch.commit();
   
-  console.log('반복 예약 저장 완료');
   return true;
 }
 
@@ -445,8 +476,6 @@ function updateStatistics() {
       reservations.push(data);
     });
     
-    console.log('전체 예약 데이터:', reservations); // 디버깅용
-    
     // 총 예약 수
     document.getElementById('totalReservations').textContent = reservations.length;
     
@@ -458,22 +487,34 @@ function updateStatistics() {
     
     // 이번 년도 예약 수
     const yearlyReservations = reservations.filter(r => {
-      const reservationDate = new Date(r.start);
-      return reservationDate.getFullYear() === currentYear;
+      try {
+        const reservationDate = new Date(r.start);
+        return !isNaN(reservationDate.getTime()) && reservationDate.getFullYear() === currentYear;
+      } catch (error) {
+        return false;
+      }
     });
     document.getElementById('yearlyReservations').textContent = yearlyReservations.length;
     
     // 이번 달 예약 수
     const monthlyReservations = yearlyReservations.filter(r => {
-      const reservationDate = new Date(r.start);
-      return reservationDate.getMonth() === currentMonth;
+      try {
+        const reservationDate = new Date(r.start);
+        return !isNaN(reservationDate.getTime()) && reservationDate.getMonth() === currentMonth;
+      } catch (error) {
+        return false;
+      }
     });
     document.getElementById('monthlyReservations').textContent = monthlyReservations.length;
     
     // 오늘 예약 수
     const todayReservations = monthlyReservations.filter(r => {
-      const reservationDate = new Date(r.start);
-      return reservationDate.getDate() === currentDate;
+      try {
+        const reservationDate = new Date(r.start);
+        return !isNaN(reservationDate.getTime()) && reservationDate.getDate() === currentDate;
+      } catch (error) {
+        return false;
+      }
     });
     document.getElementById('todayReservations').textContent = todayReservations.length;
     
@@ -501,12 +542,9 @@ function updateStatistics() {
     // 소속별 통계
     const departmentStats = {};
     reservations.forEach(r => {
-      console.log('예약 소속 데이터:', r.department, '전체 데이터:', r); // 디버깅용
       const department = r.department || '미지정';
       departmentStats[department] = (departmentStats[department] || 0) + 1;
     });
-    
-    console.log('소속별 통계:', departmentStats); // 디버깅용
     
     let departmentStatsHtml = '<div class="row g-2">';
     Object.entries(departmentStats).forEach(([department, count]) => {
@@ -571,18 +609,25 @@ function checkReservationNotifications() {
     
     snapshot.forEach(doc => {
       const reservation = doc.data();
-      const reservationDate = new Date(reservation.start);
-      const reservationDateStr = reservationDate.toISOString().split('T')[0];
-      
-      // 내일 예약이 있고, 내 예약이거나 관리자인 경우
-      if (reservationDateStr === tomorrowStr && 
-          (reservation.email === currentUser.email || isAdmin(currentUser))) {
-        const time = formatTime(reservation.start);
-        const isAllDay = reservation.allDay ? '종일' : time;
-        notifications.push({
-          title: `${reservation.name}님의 예약`,
-          message: `내일 ${isAllDay} - ${reservation.destination} (${reservation.purpose})`
-        });
+      try {
+        const reservationDate = new Date(reservation.start);
+        if (isNaN(reservationDate.getTime())) return;
+        
+        const reservationDateStr = reservationDate.toISOString().split('T')[0];
+        
+        // 내일 예약이 있고, 내 예약이거나 관리자인 경우
+        if (reservationDateStr === tomorrowStr && 
+            (reservation.email === currentUser.email || isAdmin(currentUser))) {
+          const time = formatTime(reservation.start);
+          const isAllDay = reservation.allDay ? '종일' : time;
+          notifications.push({
+            title: `${reservation.name}님의 예약`,
+            message: `내일 ${isAllDay} - ${reservation.destination} (${reservation.purpose})`
+          });
+        }
+      } catch (error) {
+        // 날짜 파싱 오류 시 무시
+        return;
       }
     });
     
@@ -596,6 +641,16 @@ function checkReservationNotifications() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // 로그인/로그아웃 UI 처리
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  
+  loginBtn.onclick = () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider);
+  };
+  logoutBtn.onclick = () => auth.signOut();
+  
   updateDatalist('name-list', 'names');
   updateDatalist('destination-list', 'destinations');
   updateDatalist('purpose-list', 'purposes');
@@ -606,106 +661,266 @@ document.addEventListener('DOMContentLoaded', function() {
     updateStatistics();
   });
   
+  // 반복 예약 관련 요소들
+  const repeatCheckbox = document.getElementById('repeatReservation');
+  const repeatOptions = document.getElementById('repeatOptions');
+  const repeatEndDate = document.getElementById('repeatEndDate');
+  const repeatEnd = document.getElementById('repeatEnd');
   
-});
-
-// 종일예약 체크 시 input type 변경
-allDayCheckbox.addEventListener('change', function() {
-  if (this.checked) {
-    startInput.type = 'date';
-    endInput.type = 'date';
-    // 시작일의 날짜만 추출
-    const startDate = new Date(startInput.value);
-    // 종료일은 시작일 + 1일
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1);
-    startInput.value = startDate.toISOString().slice(0,10);
-    endInput.value = endDate.toISOString().slice(0,10);
-    endInput.disabled = true;
-  } else {
-    startInput.type = 'datetime-local';
-    endInput.type = 'datetime-local';
-    endInput.disabled = false;
-    // 기존 값 복원(없으면 현재시간)
-    setDefaultStartTime();
-  }
-});
-
-startInput.addEventListener('change', function() {
-  if (allDayCheckbox.checked) {
-    const startDate = new Date(startInput.value);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1);
-    endInput.value = endDate.toISOString().slice(0,10);
-  }
-});
-
-// 예약 폼 제출 처리 (중복 체크 포함)
-document.getElementById('reservationForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const start = document.getElementById('start').value;
-  const end = document.getElementById('end').value;
-  const name = document.getElementById('name').value;
-  const department = document.getElementById('department').value;
-  const destination = document.getElementById('destination').value;
-  const purpose = document.getElementById('purpose').value;
-  const allDay = document.getElementById('allDay').checked;
-  const isRepeat = document.getElementById('repeatReservation').checked;
-  const repeatType = document.getElementById('repeatType').value;
-  const repeatEnd = document.getElementById('repeatEnd').value;
-
-  try {
-    // 입력값 저장
-    saveToLocalStorage('names', name);
-    saveToLocalStorage('destinations', destination);
-    saveToLocalStorage('purposes', purpose);
-
-    if (editEventId) {
-      // 수정 (반복 예약은 수정 불가)
-      await db.collection('reservations').doc(editEventId).update({
-        start, end, name, department, destination, purpose, email: currentUser.email, allDay
-      });
-      editEventId = null;
-      document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
+  // 반복 예약 체크박스 이벤트
+  repeatCheckbox.addEventListener('change', function() {
+    if (this.checked) {
+      repeatOptions.style.display = 'block';
+      repeatEndDate.style.display = 'block';
+      // 기본 종료일을 3개월 후로 설정
+      const defaultEndDate = new Date();
+      defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
+      repeatEnd.value = defaultEndDate.toISOString().slice(0, 10);
     } else {
-      // 신규 예약
-      if (isRepeat) {
-        // 반복 예약 생성
-        const success = await createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType, repeatEnd);
-        if (!success) return;
-        
-        // 반복 예약 성공 메시지
-        alert('반복 예약이 성공적으로 생성되었습니다!');
-      } else {
-        // 단일 예약 생성
-        // 중복 체크 (수정 모드일 때는 자기 자신 제외)
-        const snapshot = await db.collection('reservations').get();
-        const hasConflict = snapshot.docs.some(doc => {
-          if (editEventId && doc.id === editEventId) return false;
-          const r = doc.data();
-          return (start < r.end && end > r.start && (allDay === !!r.allDay));
-        });
-        if (hasConflict) {
-          alert('이미 해당 시간에 예약이 존재합니다!');
-          return;
+      repeatOptions.style.display = 'none';
+      repeatEndDate.style.display = 'none';
+    }
+  });
+  
+  // 종일예약 체크 시 input type 변경
+  const allDayCheckbox = document.getElementById('allDay');
+  const startInput = document.getElementById('start');
+  const endInput = document.getElementById('end');
+  
+  allDayCheckbox.addEventListener('change', function() {
+    if (this.checked) {
+      startInput.type = 'date';
+      endInput.type = 'date';
+      
+      // 현재 날짜를 기본값으로 설정
+      const today = new Date();
+      const startDate = startInput.value ? new Date(startInput.value) : today;
+      const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1);
+      
+      startInput.value = startDate.toISOString().slice(0, 10);
+      endInput.value = endDate.toISOString().slice(0, 10);
+      endInput.disabled = true;
+    } else {
+      startInput.type = 'datetime-local';
+      endInput.type = 'datetime-local';
+      endInput.disabled = false;
+      // 기존 값 복원(없으면 현재시간)
+      setDefaultStartTime();
+    }
+  });
+  
+  startInput.addEventListener('change', function() {
+    if (allDayCheckbox.checked) {
+      try {
+        const startDate = new Date(startInput.value);
+        if (!isNaN(startDate.getTime())) {
+          const endDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1);
+          endInput.value = endDate.toISOString().slice(0, 10);
         }
-        
-        await db.collection('reservations').add({
-          start, end, name, department, destination, purpose, email: currentUser.email, allDay
-        });
+      } catch (error) {
+        console.error('종일 예약 날짜 처리 오류:', error);
+        // 오류 발생 시 현재 날짜로 설정
+        const today = new Date();
+        const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+        startInput.value = today.toISOString().slice(0, 10);
+        endInput.value = tomorrow.toISOString().slice(0, 10);
       }
     }
+  });
+  
+  // 예약 폼 제출 처리 (중복 체크 포함)
+  document.getElementById('reservationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const start = document.getElementById('start').value;
+    const end = document.getElementById('end').value;
+    const name = document.getElementById('name').value;
+    const department = document.getElementById('department').value;
+    const destination = document.getElementById('destination').value;
+    const purpose = document.getElementById('purpose').value;
+    const allDay = document.getElementById('allDay').checked;
+    const isRepeat = document.getElementById('repeatReservation').checked;
+    const repeatType = document.getElementById('repeatType').value;
+    const repeatEnd = document.getElementById('repeatEnd').value;
+
+    // 필수 입력값 검증
+    if (!start || !end || !name || !department || !destination || !purpose) {
+      alert('모든 필드를 입력해주세요.');
+      return;
+    }
     
-    this.reset();
-    document.getElementById('repeatOptions').style.display = 'none';
-    document.getElementById('repeatEndDate').style.display = 'none';
-    document.getElementById('repeatReservation').checked = false;
-    // 소속 필드 리셋
-    document.getElementById('department').value = '';
-    loadReservations();
-    updateDatalist('name-list', 'names');
-    updateDatalist('destination-list', 'destinations');
-    updateDatalist('purpose-list', 'purposes');
-  } catch (error) {
-    console.error('예약 등록 오류:', error);
-    alert('예약 등록 중 오류가 발생했습니다: ' + error.message);
-  }
+    // 반복 예약인 경우 종료일 검증
+    if (isRepeat && !repeatEnd) {
+      alert('반복 종료일을 입력해주세요.');
+      return;
+    }
+    
+    // 날짜/시간 유효성 검증
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      alert('유효하지 않은 날짜/시간입니다.');
+      return;
+    }
+    
+    // 시작일이 종료일보다 늦은 경우
+    if (startDate >= endDate) {
+      alert('종료일은 시작일보다 늦어야 합니다.');
+      return;
+    }
+    
+    // 과거 날짜 예약 방지 (오늘 이전 날짜)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startDate < today) {
+      alert('과거 날짜는 예약할 수 없습니다.');
+      return;
+    }
+    
+    // 종일 예약이 아닌 경우 시간 간격 검증 (최소 30분)
+    if (!allDay) {
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const minDuration = 30 * 60 * 1000; // 30분
+      if (timeDiff < minDuration) {
+        alert('예약 시간은 최소 30분 이상이어야 합니다.');
+        return;
+      }
+    }
+
+    try {
+      // Firebase 연결 상태 확인
+      await checkFirebaseConnection();
+      
+      // 입력값 저장
+      saveToLocalStorage('names', name);
+      saveToLocalStorage('destinations', destination);
+      saveToLocalStorage('purposes', purpose);
+
+      if (editEventId) {
+        // 수정 (반복 예약은 수정 불가)
+        await db.collection('reservations').doc(editEventId).update({
+          start, end, name, department, destination, purpose, email: currentUser.email, allDay
+        });
+        editEventId = null;
+        document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
+        
+        // 수정 성공 메시지
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        const dateStr = startDate.toLocaleDateString('ko-KR');
+        const timeStr = allDay ? '종일' : `${startDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${endDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+        alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+      } else {
+        // 신규 예약
+        if (isRepeat) {
+          // 반복 예약 생성
+          const success = await createRepeatReservations(start, end, name, department, destination, purpose, allDay, repeatType, repeatEnd);
+          if (!success) return;
+          
+          // 반복 예약 성공 메시지
+          const startDate = new Date(start);
+          const endDate = new Date(repeatEnd);
+          const repeatTypeText = {
+            'daily': '매일',
+            'weekly': '매주',
+            'biweekly': '격주',
+            'monthly': '매월',
+            'yearly': '매년'
+          }[repeatType] || repeatType;
+          
+          alert(`반복 예약이 성공적으로 생성되었습니다!\n\n📅 ${startDate.toLocaleDateString('ko-KR')} ~ ${endDate.toLocaleDateString('ko-KR')}\n🔄 ${repeatTypeText} 반복\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+        } else {
+          // 단일 예약 생성
+          // 중복 체크 (수정 모드일 때는 자기 자신 제외)
+          const snapshot = await db.collection('reservations').get();
+          const hasConflict = snapshot.docs.some(doc => {
+            if (editEventId && doc.id === editEventId) return false;
+            const r = doc.data();
+            const reservationStart = new Date(start);
+            const reservationEnd = new Date(end);
+            const existingStart = new Date(r.start);
+            const existingEnd = new Date(r.end);
+            
+            // 시간 겹침 체크
+            return (reservationStart < existingEnd && reservationEnd > existingStart && (allDay === !!r.allDay));
+          });
+          if (hasConflict) {
+            alert('이미 해당 시간에 예약이 존재합니다!');
+            return;
+          }
+          
+          await db.collection('reservations').add({
+            start, end, name, department, destination, purpose, email: currentUser.email, allDay
+          });
+          
+          // 단일 예약 성공 메시지
+          const startDate = new Date(start);
+          const endDate = new Date(end);
+          const dateStr = startDate.toLocaleDateString('ko-KR');
+          const timeStr = allDay ? '종일' : `${startDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${endDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+          alert(`예약이 성공적으로 등록되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
+        }
+      }
+      
+      // 폼 리셋 및 UI 상태 초기화 (최적화된 버전)
+      this.reset();
+      
+      // DOM 요소들을 한 번에 가져와서 처리
+      const repeatOptions = document.getElementById('repeatOptions');
+      const repeatEndDate = document.getElementById('repeatEndDate');
+      const repeatReservation = document.getElementById('repeatReservation');
+      const allDayCheckbox = document.getElementById('allDay');
+      const departmentField = document.getElementById('department');
+      const startInput = document.getElementById('start');
+      const endInput = document.getElementById('end');
+      const submitButton = document.querySelector('#reservationForm button[type="submit"]');
+      
+      // 반복 예약 관련 UI 초기화
+      repeatOptions.style.display = 'none';
+      repeatEndDate.style.display = 'none';
+      repeatReservation.checked = false;
+      
+      // 종일 예약 체크박스 초기화
+      allDayCheckbox.checked = false;
+      
+      // 소속 필드 리셋
+      departmentField.value = '';
+      
+      // input type을 datetime-local로 복원
+      startInput.type = 'datetime-local';
+      endInput.type = 'datetime-local';
+      endInput.disabled = false;
+      
+      // 버튼 텍스트 복원
+      submitButton.textContent = '예약하기';
+      
+      // 기본 시간 설정
+      setDefaultStartTime();
+      
+      // 예약 목록 새로고침
+      loadReservations();
+      
+      // datalist 업데이트
+      updateDatalist('name-list', 'names');
+      updateDatalist('destination-list', 'destinations');
+      updateDatalist('purpose-list', 'purposes');
+    } catch (error) {
+      console.error('예약 등록 오류:', error);
+      
+      // 사용자 친화적인 오류 메시지
+      let errorMessage = '예약 등록 중 오류가 발생했습니다.';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = '권한이 없습니다. 다시 로그인해주세요.';
+      } else if (error.code === 'unavailable') {
+        errorMessage = '네트워크 연결을 확인해주세요.';
+      } else if (error.code === 'deadline-exceeded') {
+        errorMessage = '요청 시간이 초과되었습니다. 다시 시도해주세요.';
+      } else if (error.message) {
+        errorMessage += ' ' + error.message;
+      }
+      
+      alert(errorMessage);
+    }
+  });
 }); 
