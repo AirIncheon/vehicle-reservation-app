@@ -118,10 +118,15 @@ function setupAllDayCheckbox() {
     if (!repeatCheckbox || !repeatOptions || !repeatType) return;
     
     repeatCheckbox.addEventListener('change', function() {
+      const repeatEndDateElement = document.getElementById('repeatEndDate');
+      
       if (this.checked) {
         repeatOptions.style.display = 'block';
+        // 반복 종료일을 required로 설정
+        if (repeatEndDateElement) {
+          repeatEndDateElement.required = true;
+        }
         // 반복 종료일 기본값 설정 (예약 종료일 + 1개월)
-        const repeatEndDateElement = document.getElementById('repeatEndDate');
         if (repeatEndDateElement && endInput && endInput.value) {
           const endDate = new Date(endInput.value);
           const defaultRepeatEnd = new Date(endDate);
@@ -130,6 +135,11 @@ function setupAllDayCheckbox() {
         }
       } else {
         repeatOptions.style.display = 'none';
+        // 반복 종료일을 required 해제
+        if (repeatEndDateElement) {
+          repeatEndDateElement.required = false;
+          repeatEndDateElement.value = '';
+        }
       }
     });
   }
@@ -1006,6 +1016,12 @@ document.addEventListener('DOMContentLoaded', function() {
   setupRepeatCheckbox();
   setupStartTimeChange();
   
+  // 반복 종료일 필드 초기화 (required 해제)
+  const repeatEndDateElement = document.getElementById('repeatEndDate');
+  if (repeatEndDateElement) {
+    repeatEndDateElement.required = false;
+  }
+  
   // 통계 탭 클릭 이벤트
   statsTab.addEventListener('click', function() {
     updateStatistics();
@@ -1304,7 +1320,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
       
-      // 폼 리셋 및 캐시 정리
+      // 폼 리셋
       this.reset();
       repeatOptions.style.display = 'none';
       repeatCheckbox.checked = false;
@@ -1314,12 +1330,6 @@ document.addEventListener('DOMContentLoaded', function() {
       startInput.type = 'datetime-local';
       endInput.type = 'datetime-local';
       endInput.disabled = false;
-      
-      // 입력 필드 캐시 완전 정리
-      document.getElementById('name').value = '';
-      document.getElementById('destination').value = '';
-      document.getElementById('purpose').value = '';
-      
       setDefaultStartTime();
       loadReservations();
       
