@@ -117,9 +117,19 @@ function setupAllDayCheckbox() {
 function setupRepeatCheckbox() {
   if (!repeatCheckbox || !repeatOptions || !repeatType) return;
   
+  // 반복 종료일 필드 완전 숨기기 (혹시 남아있다면)
+  const repeatEndDateElement = document.getElementById('repeatEndDate');
+  if (repeatEndDateElement) {
+    repeatEndDateElement.style.display = 'none';
+  }
+  
   repeatCheckbox.addEventListener('change', function() {
     if (this.checked) {
       repeatOptions.style.display = 'block';
+      // 반복 종료일 필드가 있다면 숨기기
+      if (repeatEndDateElement) {
+        repeatEndDateElement.style.display = 'none';
+      }
     } else {
       repeatOptions.style.display = 'none';
     }
@@ -189,9 +199,9 @@ async function createRepeatReservations(start, end, name, department, destinatio
         nextEnd.setDate(nextEnd.getDate() + 1);
         break;
       case 'weekly':
-        // 매주 같은 요일로 설정
-        nextStart.setDate(nextStart.getDate() + 7);
-        nextEnd.setDate(nextEnd.getDate() + 7);
+        // 매주 같은 요일로 설정 (정확한 7일 후)
+        nextStart.setTime(nextStart.getTime() + (7 * 24 * 60 * 60 * 1000));
+        nextEnd.setTime(nextEnd.getTime() + (7 * 24 * 60 * 60 * 1000));
         break;
       case 'yearly':
         nextStart.setFullYear(nextStart.getFullYear() + 1);
@@ -510,6 +520,12 @@ function populateEditForm(eventObj) {
     if (repeatOptions) repeatOptions.style.display = 'block';
     if (repeatCheckbox) repeatCheckbox.checked = true;
     if (repeatType) repeatType.value = eventObj.extendedProps.repeatType || 'weekly';
+    
+    // 반복 종료일 필드가 있다면 숨기기
+    const repeatEndDateElement = document.getElementById('repeatEndDate');
+    if (repeatEndDateElement) {
+      repeatEndDateElement.style.display = 'none';
+    }
   } else {
     // 수정 모드에서는 반복 예약 옵션 숨기기
     if (repeatOptions) repeatOptions.style.display = 'none';
