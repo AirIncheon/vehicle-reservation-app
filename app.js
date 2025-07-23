@@ -1048,15 +1048,17 @@ document.addEventListener('DOMContentLoaded', function() {
   // 예약 폼 제출 이벤트
   reservationForm.addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+    const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
-    if (allDayCheckbox.checked) {
-      // 종일 예약: KST 00:00~23:59를 UTC로 변환
-      const allDayRange = allDayKSTtoUTCISO(startInput.value);
-      startUTC = allDayRange.start;
-      endUTC = allDayRange.end;
+    if (allDay) {
+      // 종일 예약: 시작일(date)만 사용, 종료일은 자동 계산
+      const startDateStr = startInput.value; // yyyy-mm-dd
+      const startKST = new Date(startDateStr + 'T00:00:00+09:00');
+      const endKST = new Date(startDateStr + 'T23:59:59+09:00');
+      startUTC = new Date(startKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
+      endUTC = new Date(endKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
     } else {
-      // 일반 예약: datetime-local input은 KST 기준이므로 UTC로 변환
+      // 일반 예약: 기존대로
       startUTC = toUTC(new Date(startInput.value)).toISOString();
       endUTC = toUTC(new Date(endInput.value)).toISOString();
     }
