@@ -1081,14 +1081,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
     if (allDay) {
-      // 종일 예약: 시작일(date)만 사용, 종료일은 자동 계산
-      const startDateStr = startInput.value; // yyyy-mm-dd
+      const startDateStr = startInput.value;
       const startKST = new Date(startDateStr + 'T00:00:00+09:00');
       const endKST = new Date(startDateStr + 'T23:59:59+09:00');
       startUTC = new Date(startKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
       endUTC = new Date(endKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
     } else {
-      // 일반 예약: 기존대로
       startUTC = toUTC(new Date(startInput.value)).toISOString();
       endUTC = toUTC(new Date(endInput.value)).toISOString();
     }
@@ -1106,12 +1104,13 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // 날짜/시간 유효성 검증
-    const startDate = new Date(startUTC);
-    const endDate = new Date(endUTC);
-    
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      alert('유효하지 않은 날짜/시간입니다.');
+    // 날짜/시간 유효성 검증 (KST 기준)
+    const startDate = new Date(startInput.value); // KST 기준
+    const endDate = new Date(endInput.value);
+    const now = new Date();
+    const todayKST = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 로컬 타임존 오늘 00:00
+    if (startDate < todayKST) {
+      alert('과거 날짜는 예약할 수 없습니다.');
       return;
     }
     
@@ -1128,14 +1127,6 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('종료일은 시작일보다 늦어야 합니다.');
         return;
       }
-    }
-    
-    // 과거 날짜 예약 방지
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (startDate < today) {
-      alert('과거 날짜는 예약할 수 없습니다.');
-      return;
     }
     
     // 반복 예약 추가 검증
