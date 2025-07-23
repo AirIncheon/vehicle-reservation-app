@@ -1090,15 +1090,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
     if (allDay) {
-      // 종일 예약: KST 기준으로 변환 후 UTC로 저장
-      const startDateStr = startInput.value;
-      const startKST = new Date(startDateStr + 'T00:00:00+09:00');
-      const endKST = new Date(startDateStr + 'T23:59:59+09:00');
+      const startKST = new Date(startInput.value + 'T00:00:00+09:00');
+      const endKST = new Date(startInput.value + 'T23:59:59+09:00');
       startUTC = toUTC(startKST).toISOString();
       endUTC = toUTC(endKST).toISOString();
     } else {
-      startUTC = toUTC(new Date(startInput.value)).toISOString();
-      endUTC = toUTC(new Date(endInput.value)).toISOString();
+      // 일반 예약: 입력값을 그대로 ISO 문자열로 저장 (toUTC 변환 제거)
+      startUTC = new Date(startInput.value).toISOString();
+      endUTC = new Date(endInput.value).toISOString();
     }
     
     const name = document.getElementById('name').value;
