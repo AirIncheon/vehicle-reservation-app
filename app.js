@@ -94,25 +94,23 @@ function setupAllDayCheckbox() {
   const endGroup = document.getElementById('end-group');
   allDayCheckbox.addEventListener('change', function() {
     if (this.checked) {
-      // 종일 예약: date 타입, 종료일 숨김 및 값 초기화
       startInput.type = 'date';
       if (endGroup) {
         endGroup.style.display = 'none';
         endInput.value = '';
-        endInput.required = false; // required 해제
+        endInput.required = false;
+        endInput.disabled = true; // 폼 검증에서 완전히 제외
       }
-      // 오늘 날짜로 초기화
       const today = new Date();
       startInput.value = formatDate(today);
     } else {
-      // 일반 예약: datetime-local 타입, 종료일 보임 및 값 세팅
       startInput.type = 'datetime-local';
       if (endGroup) {
         endGroup.style.display = '';
         endInput.value = '';
-        endInput.required = true; // required 복원
+        endInput.required = true;
+        endInput.disabled = false; // 다시 활성화
       }
-      // 종일 예약 해제 시, 예약 원본(UTC)에서 KST로 변환한 날짜를 기준으로 00:00, 23:59로 세팅
       if (window._lastEventObj) {
         const utcStart = new Date(window._lastEventObj.start);
         const kstDate = toKST(utcStart);
@@ -120,7 +118,6 @@ function setupAllDayCheckbox() {
         startInput.value = dateStr + 'T00:00';
         endInput.value = dateStr + 'T23:59';
       } else {
-        // fallback: 오늘 날짜
         const today = new Date();
         const dateStr = formatDate(today);
         startInput.value = dateStr + 'T00:00';
