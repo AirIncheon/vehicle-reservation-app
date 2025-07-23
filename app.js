@@ -99,17 +99,24 @@ function setupAllDayCheckbox() {
         endGroup.style.display = 'none';
         endInput.value = '';
         endInput.required = false;
-        endInput.disabled = true; // 폼 검증에서 완전히 제외
+        endInput.disabled = true;
       }
-      const today = new Date();
-      startInput.value = formatDate(today);
+      // datetime-local에서 date로 바꿀 때, 로컬 타임존 기준 yyyy-mm-dd 추출
+      let dateStr;
+      if (startInput.value && startInput.value.length >= 10) {
+        dateStr = startInput.value.slice(0, 10);
+      } else {
+        const today = new Date();
+        dateStr = formatDate(today);
+      }
+      startInput.value = dateStr;
     } else {
       startInput.type = 'datetime-local';
       if (endGroup) {
         endGroup.style.display = '';
         endInput.value = '';
         endInput.required = true;
-        endInput.disabled = false; // 다시 활성화
+        endInput.disabled = false;
       }
       if (window._lastEventObj) {
         const utcStart = new Date(window._lastEventObj.start);
@@ -1063,6 +1070,13 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 예약 폼 제출 이벤트
   reservationForm.addEventListener('submit', async function(e) {
+    if (allDayCheckbox && allDayCheckbox.checked) {
+      endInput.required = false;
+      endInput.disabled = true;
+    } else {
+      endInput.required = true;
+      endInput.disabled = false;
+    }
     e.preventDefault();
     const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
