@@ -598,6 +598,12 @@ function allDayKSTtoUTCISO(dateStr) {
   };
 }
 
+// datetime-local 입력값을 KST로 해석하는 함수
+function parseKSTDateTime(inputValue) {
+  // inputValue: "2025-07-24T08:00"
+  return new Date(inputValue + ':00+09:00');
+}
+
 // 수정 폼에 데이터 채우기
 function populateEditForm(eventObj) {
   if (!allDayCheckbox || !startInput || !endInput) return;
@@ -1095,9 +1101,11 @@ document.addEventListener('DOMContentLoaded', function() {
       startUTC = toUTC(startKST).toISOString();
       endUTC = toUTC(endKST).toISOString();
     } else {
-      // 일반 예약: 입력값을 그대로 ISO 문자열로 저장 (toUTC 변환 제거)
-      startUTC = new Date(startInput.value).toISOString();
-      endUTC = new Date(endInput.value).toISOString();
+      // 일반 예약: 입력값을 KST로 해석 후 UTC로 변환하여 저장
+      const startKST = parseKSTDateTime(startInput.value);
+      const endKST = parseKSTDateTime(endInput.value);
+      startUTC = toUTC(startKST).toISOString();
+      endUTC = toUTC(endKST).toISOString();
     }
     
     const name = document.getElementById('name').value;
