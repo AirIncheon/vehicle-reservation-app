@@ -104,13 +104,16 @@ function setupAllDayCheckbox() {
       const today = new Date();
       startInput.value = formatDate(today);
     } else {
-      // 일반 예약: datetime-local 타입, 종료일 보임 및 값 초기화
+      // 일반 예약: datetime-local 타입, 종료일 보임 및 값 세팅
       startInput.type = 'datetime-local';
       if (endGroup) {
         endGroup.style.display = '';
         endInput.value = '';
       }
-      setDefaultStartTime();
+      // 종일 예약 해제 시, 시작은 00:00, 종료는 23:59로 자동 세팅
+      const dateStr = startInput.value; // yyyy-mm-dd
+      startInput.value = dateStr + 'T00:00';
+      endInput.value = dateStr + 'T23:59';
     }
   });
 }
