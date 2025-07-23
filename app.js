@@ -577,24 +577,29 @@ function populateEditForm(eventObj) {
   const isAllDay = eventObj.allDay;
   const endGroup = document.getElementById('end-group');
   allDayCheckbox.checked = isAllDay;
+  // UTC 원본값에서만 변환
+  const utcStart = new Date(eventObj.start);
+  const utcEnd = new Date(eventObj.end);
   if (isAllDay) {
     startInput.type = 'date';
     if (endGroup) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
-    const startDate = toKST(new Date(eventObj.start));
-    startInput.value = formatDate(startDate);
+    // 종일 예약: UTC→KST 변환 후 yyyy-mm-dd
+    const startDateKST = toKST(utcStart);
+    startInput.value = formatDate(startDateKST);
   } else {
     startInput.type = 'datetime-local';
     if (endGroup) {
       endGroup.style.display = '';
       endInput.value = '';
     }
-    const startDate = toKST(new Date(eventObj.start));
-    const endDate = toKST(new Date(eventObj.end));
-    startInput.value = startDate.toISOString().slice(0, 16);
-    endInput.value = endDate.toISOString().slice(0, 16);
+    // 일반 예약: UTC→KST 변환 후 input value
+    const startDateKST = toKST(utcStart);
+    const endDateKST = toKST(utcEnd);
+    startInput.value = startDateKST.toISOString().slice(0, 16);
+    endInput.value = endDateKST.toISOString().slice(0, 16);
   }
   
   // 나머지 필드 설정
