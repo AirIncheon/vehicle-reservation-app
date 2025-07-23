@@ -613,6 +613,7 @@ function populateEditForm(eventObj) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
+    // UTC→KST 변환 후 yyyy-mm-dd로 변환
     const startDateKST = toKST(utcStart);
     startInput.value = formatDate(startDateKST);
   } else {
@@ -1089,11 +1090,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
     if (allDay) {
+      // 종일 예약: KST 기준으로 변환 후 UTC로 저장
       const startDateStr = startInput.value;
       const startKST = new Date(startDateStr + 'T00:00:00+09:00');
       const endKST = new Date(startDateStr + 'T23:59:59+09:00');
-      startUTC = new Date(startKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
-      endUTC = new Date(endKST.getTime() - 9 * 60 * 60 * 1000).toISOString();
+      startUTC = toUTC(startKST).toISOString();
+      endUTC = toUTC(endKST).toISOString();
     } else {
       startUTC = toUTC(new Date(startInput.value)).toISOString();
       endUTC = toUTC(new Date(endInput.value)).toISOString();

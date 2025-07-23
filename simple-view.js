@@ -51,6 +51,8 @@ function createReservationHTML(reservation) {
       </div>
     `;
   } else {
+    // UTC ISO 문자열을 Date 객체로 만들 때, 항상 명시적으로 처리
+    // (브라우저별 파싱 차이 방지)
     const startTime = toKST(new Date(reservation.start));
     const endTime = toKST(new Date(reservation.end));
     let timeRange;
