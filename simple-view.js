@@ -25,8 +25,7 @@ function formatKSTDate(date) {
 }
 // 시간을 HH:MM 형식으로 변환 (KST)
 function formatKSTTime(date) {
-  const kst = toKST(date);
-  return kst.toTimeString().slice(0, 5);
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 // 예약 데이터를 시간순으로 정렬
@@ -54,7 +53,12 @@ function createReservationHTML(reservation) {
   } else {
     const startTime = toKST(new Date(reservation.start));
     const endTime = toKST(new Date(reservation.end));
-    const timeRange = `${formatKSTTime(startTime)} - ${formatKSTTime(endTime)}`;
+    let timeRange;
+    if (endTime <= startTime) {
+      timeRange = `${formatKSTTime(startTime)} ~ 익일 ${formatKSTTime(endTime)}`;
+    } else {
+      timeRange = `${formatKSTTime(startTime)} ~ ${formatKSTTime(endTime)}`;
+    }
     const purpose = reservation.purpose || reservation.title || '목적 미정';
     const user = reservation.name || reservation.userName || reservation.userEmail || '사용자 미정';
     const destination = reservation.destination || '';
@@ -71,56 +75,46 @@ function createReservationHTML(reservation) {
 // KST 기준 오늘/내일 00:00~23:59를 UTC로 변환하는 함수 추가
 function getKSTDateRange(offsetDay = 0) {
   const now = new Date();
-  // KST 기준 날짜로 맞춤
   now.setHours(0, 0, 0, 0);
   now.setDate(now.getDate() + offsetDay);
-  // KST → UTC 변환
   const startUTC = new Date(now.getTime() - 9 * 60 * 60 * 1000);
   const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
   return {
-    start: startUTC.toISOString(),
-    end: endUTC.toISOString()
+    start: startUTC,
+    end: endUTC
   };
 }
 
 // 예약 데이터 로딩
 async function loadReservations() {
   try {
-    // 오늘/내일 KST 기준 날짜
-    const now = new Date();
-    const todayKST = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    todayKST.setHours(0, 0, 0, 0);
-    const tomorrowKST = new Date(todayKST);
-    tomorrowKST.setDate(todayKST.getDate() + 1);
-    // 전체 예약 불러오기
+    const todayRange = getKSTDateRange(0);
+    const tomorrowRange = getKSTDateRange(1);
     const snapshot = await db.collection('reservations').get();
     const todayReservations = [];
     const tomorrowReservations = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      const start = toKST(new Date(data.start));
-      const end = toKST(new Date(data.end));
-      // allDay 예약은 KST 기준 오늘/내일에 포함되는지 별도 체크
+      const startUTC = new Date(data.start);
+      const endUTC = new Date(data.end);
       if (data.allDay) {
-        // 오늘
-        if (start <= todayKST && end >= todayKST) {
+        // allDay 예약: 오늘/내일 KST 범위와 겹치는지 체크
+        if (startUTC <= todayRange.end && endUTC >= todayRange.start) {
           todayReservations.push({ id: doc.id, ...data });
         }
-        // 내일
-        if (start <= tomorrowKST && end >= tomorrowKST) {
+        if (startUTC <= tomorrowRange.end && endUTC >= tomorrowRange.start) {
           tomorrowReservations.push({ id: doc.id, ...data });
         }
       } else {
-        // 일반 예약: 시작일이 오늘/내일과 같은지 체크
-        if (formatKSTDate(start) === formatKSTDate(todayKST)) {
+        // 일반 예약: 시작이 오늘/내일 KST 범위 내에 있는지 체크
+        if (startUTC >= todayRange.start && startUTC <= todayRange.end) {
           todayReservations.push({ id: doc.id, ...data });
         }
-        if (formatKSTDate(start) === formatKSTDate(tomorrowKST)) {
+        if (startUTC >= tomorrowRange.start && startUTC <= tomorrowRange.end) {
           tomorrowReservations.push({ id: doc.id, ...data });
         }
       }
     });
-    // 데이터 정렬
     const sortedTodayReservations = sortReservationsByTime(todayReservations);
     const sortedTomorrowReservations = sortReservationsByTime(tomorrowReservations);
     updateReservationDisplay('todayContent', sortedTodayReservations);
