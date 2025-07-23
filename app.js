@@ -110,10 +110,20 @@ function setupAllDayCheckbox() {
         endGroup.style.display = '';
         endInput.value = '';
       }
-      // 종일 예약 해제 시, 시작은 00:00, 종료는 23:59로 자동 세팅
-      const dateStr = startInput.value; // yyyy-mm-dd
-      startInput.value = dateStr + 'T00:00';
-      endInput.value = dateStr + 'T23:59';
+      // 종일 예약 해제 시, 예약 원본(UTC)에서 KST로 변환한 날짜를 기준으로 00:00, 23:59로 세팅
+      if (window._lastEventObj) {
+        const utcStart = new Date(window._lastEventObj.start);
+        const kstDate = toKST(utcStart);
+        const dateStr = formatDate(kstDate); // yyyy-mm-dd
+        startInput.value = dateStr + 'T00:00';
+        endInput.value = dateStr + 'T23:59';
+      } else {
+        // fallback: 오늘 날짜
+        const today = new Date();
+        const dateStr = formatDate(today);
+        startInput.value = dateStr + 'T00:00';
+        endInput.value = dateStr + 'T23:59';
+      }
     }
   });
 }
@@ -577,10 +587,10 @@ function allDayKSTtoUTCISO(dateStr) {
 // 수정 폼에 데이터 채우기
 function populateEditForm(eventObj) {
   if (!allDayCheckbox || !startInput || !endInput) return;
+  window._lastEventObj = eventObj; // 현재 수정 중 예약의 원본 저장
   const isAllDay = eventObj.allDay;
   const endGroup = document.getElementById('end-group');
   allDayCheckbox.checked = isAllDay;
-  // UTC 원본값에서만 변환
   const utcStart = new Date(eventObj.start);
   const utcEnd = new Date(eventObj.end);
   if (isAllDay) {
@@ -589,7 +599,6 @@ function populateEditForm(eventObj) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
-    // 종일 예약: UTC→KST 변환 후 yyyy-mm-dd
     const startDateKST = toKST(utcStart);
     startInput.value = formatDate(startDateKST);
   } else {
@@ -598,7 +607,6 @@ function populateEditForm(eventObj) {
       endGroup.style.display = '';
       endInput.value = '';
     }
-    // 일반 예약: UTC→KST 변환 후 input value
     const startDateKST = toKST(utcStart);
     const endDateKST = toKST(utcEnd);
     startInput.value = startDateKST.toISOString().slice(0, 16);
