@@ -54,26 +54,38 @@ function createReservationHTML(reservation) {
   `;
 }
 
+// KST 기준 오늘/내일 00:00~23:59를 UTC로 변환하는 함수 추가
+function getKSTDateRange(offsetDay = 0) {
+  const now = new Date();
+  // KST 기준 날짜로 맞춤
+  now.setHours(0, 0, 0, 0);
+  now.setDate(now.getDate() + offsetDay);
+  // KST → UTC 변환
+  const startUTC = new Date(now.getTime() - 9 * 60 * 60 * 1000);
+  const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return {
+    start: startUTC.toISOString(),
+    end: endUTC.toISOString()
+  };
+}
+
 // 예약 데이터 로딩
 async function loadReservations() {
   try {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const todayStr = formatDate(today);
-    const tomorrowStr = formatDate(tomorrow);
-    
-    // 오늘 예약 조회
+    // KST 기준 오늘/내일 범위 UTC로 변환
+    const todayRange = getKSTDateRange(0);
+    const tomorrowRange = getKSTDateRange(1);
+
+    // 오늘 예약 조회 (KST 기준)
     const todaySnapshot = await db.collection('reservations')
-      .where('start', '>=', todayStr + 'T00:00:00')
-      .where('start', '<', todayStr + 'T23:59:59')
+      .where('start', '>=', todayRange.start)
+      .where('start', '<=', todayRange.end)
       .get();
-    
-    // 내일 예약 조회
+
+    // 내일 예약 조회 (KST 기준)
     const tomorrowSnapshot = await db.collection('reservations')
-      .where('start', '>=', tomorrowStr + 'T00:00:00')
-      .where('start', '<', tomorrowStr + 'T23:59:59')
+      .where('start', '>=', tomorrowRange.start)
+      .where('start', '<=', tomorrowRange.end)
       .get();
     
     // 오늘 예약 데이터 처리
