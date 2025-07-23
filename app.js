@@ -574,32 +574,27 @@ function allDayKSTtoUTCISO(dateStr) {
 // 수정 폼에 데이터 채우기
 function populateEditForm(eventObj) {
   if (!allDayCheckbox || !startInput || !endInput) return;
-  
   const isAllDay = eventObj.allDay;
-  
-  // 종일 예약 체크박스 설정
+  const endGroup = document.getElementById('end-group');
   allDayCheckbox.checked = isAllDay;
-  
   if (isAllDay) {
-    // 종일 예약: date 타입
     startInput.type = 'date';
-    endInput.type = 'date';
-    
+    if (endGroup) {
+      endGroup.style.display = 'none';
+      endInput.value = '';
+    }
     const startDate = new Date(eventObj.start);
-    const endDate = new Date(eventObj.end);
-    
     startInput.value = formatDate(startDate);
-    endInput.value = formatDate(endDate);
   } else {
-    // 일반 예약: datetime-local 타입
     startInput.type = 'datetime-local';
-    endInput.type = 'datetime-local';
-    
+    if (endGroup) {
+      endGroup.style.display = '';
+      endInput.value = '';
+    }
     const startDate = new Date(eventObj.start);
     const endDate = new Date(eventObj.end);
-    
-    startInput.value = toUTC(startDate).toISOString().slice(0, 16);
-    endInput.value = toUTC(endDate).toISOString().slice(0, 16);
+    startInput.value = toKST(startDate).toISOString().slice(0, 16);
+    endInput.value = toKST(endDate).toISOString().slice(0, 16);
   }
   
   // 나머지 필드 설정
