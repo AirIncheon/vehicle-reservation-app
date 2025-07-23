@@ -14,9 +14,13 @@ const db = firebase.firestore();
 // 전역 변수
 let autoRefreshInterval = null;
 
-// UTC→KST 변환
+// UTC→KST 변환 (app.js와 동일하게)
 function toKST(date) {
   return new Date(date.getTime() + 9 * 60 * 60 * 1000);
+}
+// KST→UTC 변환 (app.js와 동일하게)
+function toUTC(date) {
+  return new Date(date.getTime() - 9 * 60 * 60 * 1000);
 }
 // KST 날짜를 YYYY-MM-DD로 반환
 function formatKSTDate(date) {

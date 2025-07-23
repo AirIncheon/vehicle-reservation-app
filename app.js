@@ -579,11 +579,11 @@ function showEventModal(html, eventObj) {
   }
 }
 
-// UTC→KST 변환
+// UTC→KST 변환 (simple-view.js와 동일하게)
 function toKST(date) {
   return new Date(date.getTime() + 9 * 60 * 60 * 1000);
 }
-// KST→UTC 변환
+// KST→UTC 변환 (simple-view.js와 동일하게)
 function toUTC(date) {
   return new Date(date.getTime() - 9 * 60 * 60 * 1000);
 }
