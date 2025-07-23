@@ -583,7 +583,7 @@ function populateEditForm(eventObj) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
-    const startDate = new Date(eventObj.start);
+    const startDate = toKST(new Date(eventObj.start));
     startInput.value = formatDate(startDate);
   } else {
     startInput.type = 'datetime-local';
@@ -591,10 +591,10 @@ function populateEditForm(eventObj) {
       endGroup.style.display = '';
       endInput.value = '';
     }
-    const startDate = new Date(eventObj.start);
-    const endDate = new Date(eventObj.end);
-    startInput.value = toKST(startDate).toISOString().slice(0, 16);
-    endInput.value = toKST(endDate).toISOString().slice(0, 16);
+    const startDate = toKST(new Date(eventObj.start));
+    const endDate = toKST(new Date(eventObj.end));
+    startInput.value = startDate.toISOString().slice(0, 16);
+    endInput.value = endDate.toISOString().slice(0, 16);
   }
   
   // 나머지 필드 설정
