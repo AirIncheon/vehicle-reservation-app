@@ -550,6 +550,12 @@ function showEventModal(html, eventObj) {
   }, 100);
 }
 
+// UTC → KST 변환 후 datetime-local input용 문자열 반환
+function toDatetimeLocalString(date) {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 16);
+}
+
 // 수정 폼에 데이터 채우기
 function populateEditForm(eventObj) {
   if (!allDayCheckbox || !startInput || !endInput) return;
@@ -577,8 +583,8 @@ function populateEditForm(eventObj) {
     const startDate = new Date(eventObj.start);
     const endDate = new Date(eventObj.end);
     
-    startInput.value = startDate.toISOString().slice(0, 16);
-    endInput.value = endDate.toISOString().slice(0, 16);
+    startInput.value = toDatetimeLocalString(startDate);
+    endInput.value = toDatetimeLocalString(endDate);
   }
   
   // 나머지 필드 설정
