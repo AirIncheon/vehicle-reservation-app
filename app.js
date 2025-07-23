@@ -94,16 +94,22 @@ function setupAllDayCheckbox() {
   const endGroup = document.getElementById('end-group');
   allDayCheckbox.addEventListener('change', function() {
     if (this.checked) {
-      // 종일 예약: date 타입, 종료일 숨김
+      // 종일 예약: date 타입, 종료일 숨김 및 값 초기화
       startInput.type = 'date';
-      if (endGroup) endGroup.style.display = 'none';
+      if (endGroup) {
+        endGroup.style.display = 'none';
+        endInput.value = '';
+      }
       // 오늘 날짜로 초기화
       const today = new Date();
       startInput.value = formatDate(today);
     } else {
-      // 일반 예약: datetime-local 타입, 종료일 보임
+      // 일반 예약: datetime-local 타입, 종료일 보임 및 값 초기화
       startInput.type = 'datetime-local';
-      if (endGroup) endGroup.style.display = '';
+      if (endGroup) {
+        endGroup.style.display = '';
+        endInput.value = '';
+      }
       setDefaultStartTime();
     }
   });
