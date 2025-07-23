@@ -91,23 +91,19 @@ function setDefaultStartTime() {
 // 종일 예약 체크박스 이벤트
 function setupAllDayCheckbox() {
   if (!allDayCheckbox || !startInput || !endInput) return;
-  
+  const endGroup = document.getElementById('end-group');
   allDayCheckbox.addEventListener('change', function() {
     if (this.checked) {
-      // 종일 예약: date 타입으로 변경
+      // 종일 예약: date 타입, 종료일 숨김
       startInput.type = 'date';
-      endInput.type = 'date';
-      
+      if (endGroup) endGroup.style.display = 'none';
+      // 오늘 날짜로 초기화
       const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
       startInput.value = formatDate(today);
-      endInput.value = formatDate(tomorrow);
     } else {
-      // 일반 예약: datetime-local 타입으로 변경
+      // 일반 예약: datetime-local 타입, 종료일 보임
       startInput.type = 'datetime-local';
-      endInput.type = 'datetime-local';
+      if (endGroup) endGroup.style.display = '';
       setDefaultStartTime();
     }
   });
@@ -550,10 +546,23 @@ function showEventModal(html, eventObj) {
   }, 100);
 }
 
-// UTC → KST 변환 후 datetime-local input용 문자열 반환
-function toDatetimeLocalString(date) {
-  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 16);
+// UTC→KST 변환
+function toKST(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000);
+}
+// KST→UTC 변환
+function toUTC(date) {
+  return new Date(date.getTime() - 9 * 60 * 60 * 1000);
+}
+// KST 날짜를 UTC ISO로 변환 (종일 예약용)
+function allDayKSTtoUTCISO(dateStr) {
+  // dateStr: yyyy-mm-dd
+  const startKST = new Date(dateStr + 'T00:00:00+09:00');
+  const endKST = new Date(dateStr + 'T23:59:59+09:00');
+  return {
+    start: toUTC(startKST).toISOString(),
+    end: toUTC(endKST).toISOString()
+  };
 }
 
 // 수정 폼에 데이터 채우기
@@ -583,8 +592,8 @@ function populateEditForm(eventObj) {
     const startDate = new Date(eventObj.start);
     const endDate = new Date(eventObj.end);
     
-    startInput.value = toDatetimeLocalString(startDate);
-    endInput.value = toDatetimeLocalString(endDate);
+    startInput.value = toUTC(startDate).toISOString().slice(0, 16);
+    endInput.value = toUTC(endDate).toISOString().slice(0, 16);
   }
   
   // 나머지 필드 설정
@@ -1040,25 +1049,34 @@ document.addEventListener('DOMContentLoaded', function() {
   reservationForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const start = startInput.value;
-    const end = endInput.value;
+    let startUTC, endUTC;
+    if (allDayCheckbox.checked) {
+      // 종일 예약: KST 00:00~23:59를 UTC로 변환
+      const allDayRange = allDayKSTtoUTCISO(startInput.value);
+      startUTC = allDayRange.start;
+      endUTC = allDayRange.end;
+    } else {
+      // 일반 예약: datetime-local input은 KST 기준이므로 UTC로 변환
+      startUTC = toUTC(new Date(startInput.value)).toISOString();
+      endUTC = toUTC(new Date(endInput.value)).toISOString();
+    }
+    
     const name = document.getElementById('name').value;
     const department = document.getElementById('department').value;
     const destination = document.getElementById('destination').value;
     const purpose = document.getElementById('purpose').value;
-    const allDay = allDayCheckbox.checked;
     const isRepeat = repeatCheckbox.checked;
     const repeatTypeValue = repeatType.value;
 
     // 필수 입력값 검증
-    if (!start || !end || !name || !department || !destination || !purpose) {
+    if (!startUTC || !endUTC || !name || !department || !destination || !purpose) {
       alert('모든 필드를 입력해주세요.');
       return;
     }
     
     // 날짜/시간 유효성 검증
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = new Date(startUTC);
+    const endDate = new Date(endUTC);
     
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       alert('유효하지 않은 날짜/시간입니다.');
@@ -1066,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 시작일과 종료일 검증 (종일 예약은 시작일과 종료일이 같을 수 있음)
-    if (allDay) {
+    if (allDayCheckbox.checked) {
       // 종일 예약: 시작일이 종료일보다 늦으면 안됨
       if (startDate > endDate) {
         alert('종일 예약의 종료일은 시작일보다 늦거나 같아야 합니다.');
@@ -1098,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       } else if (repeatTypeValue === 'weekly') {
         // 매주 반복: 예약 기간이 6일을 초과하면 안됨
-        const durationDays = Math.ceil((endDate - startDate) / (24 * 60 * 60 * 1000));
+        const durationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
         if (durationDays > 6) {
           alert('매주 반복 예약의 경우 예약 기간이 6일을 초과할 수 없습니다.');
           return;
@@ -1107,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 일반 예약의 경우 시간 간격 검증 (최소 30분)
-    if (!allDay) {
+    if (!allDayCheckbox.checked) {
       const timeDiff = endDate.getTime() - startDate.getTime();
       const minDuration = 30 * 60 * 1000;
       if (timeDiff < minDuration) {
@@ -1131,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           const repeatEndDateTime = new Date(repeatEndDate);
-          const startDate = new Date(start);
+          const startDate = new Date(startUTC);
           if (repeatEndDateTime < startDate) {
             alert('반복 종료일은 예약 시작일보다 늦어야 합니다.');
             return;
@@ -1151,12 +1169,12 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           // 새로운 반복 예약 생성
-          const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
+          const success = await createRepeatReservations(startUTC, endUTC, repeatEndDate, name, department, destination, purpose, allDayCheckbox.checked, repeatTypeValue);
           if (!success) return;
           
           // 수정 성공 메시지
-          const modifiedStartDate = new Date(start);
-          const modifiedEndDate = new Date(end);
+          const modifiedStartDate = new Date(startUTC);
+          const modifiedEndDate = new Date(endUTC);
           const repeatTypeText = {
             'daily': '매일',
             'weekly': '매주',
@@ -1180,14 +1198,14 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // 새로운 단일 예약 생성
           await db.collection('reservations').add({
-            start, end, name, department, destination, purpose, email: currentUser.email, allDay
+            start: startUTC, end: endUTC, name, department, destination, purpose, email: currentUser.email, allDay: allDayCheckbox.checked
           });
           
           // 수정 성공 메시지
-          const modifiedStartDate = new Date(start);
-          const modifiedEndDate = new Date(end);
+          const modifiedStartDate = new Date(startUTC);
+          const modifiedEndDate = new Date(endUTC);
           const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
-          const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+          const timeStr = allDayCheckbox.checked ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
           alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
         } else {
           // 단일 예약 수정 또는 단일 예약을 반복 예약으로 변경
@@ -1200,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const repeatEndDateTime = new Date(repeatEndDate);
-            const startDate = new Date(start);
+            const startDate = new Date(startUTC);
             if (repeatEndDateTime < startDate) {
               alert('반복 종료일은 예약 시작일보다 늦어야 합니다.');
               return;
@@ -1210,12 +1228,12 @@ document.addEventListener('DOMContentLoaded', function() {
             await db.collection('reservations').doc(editEventId).delete();
             
             // 새로운 반복 예약 생성
-            const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
+            const success = await createRepeatReservations(startUTC, endUTC, repeatEndDate, name, department, destination, purpose, allDayCheckbox.checked, repeatTypeValue);
             if (!success) return;
             
             // 수정 성공 메시지
-            const modifiedStartDate = new Date(start);
-            const modifiedEndDate = new Date(end);
+            const modifiedStartDate = new Date(startUTC);
+            const modifiedEndDate = new Date(endUTC);
             const repeatTypeText = {
               'daily': '매일',
               'weekly': '매주',
@@ -1226,14 +1244,14 @@ document.addEventListener('DOMContentLoaded', function() {
           } else {
             // 단일 예약 수정
             await db.collection('reservations').doc(editEventId).update({
-              start, end, name, department, destination, purpose, email: currentUser.email, allDay
+              start: startUTC, end: endUTC, name, department, destination, purpose, email: currentUser.email, allDay: allDayCheckbox.checked
             });
             
             // 수정 성공 메시지
-            const modifiedStartDate = new Date(start);
-            const modifiedEndDate = new Date(end);
+            const modifiedStartDate = new Date(startUTC);
+            const modifiedEndDate = new Date(endUTC);
             const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
-            const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+            const timeStr = allDayCheckbox.checked ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
             alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
           }
         }
@@ -1242,10 +1260,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('#reservationForm button[type="submit"]').textContent = '예약하기';
         
         // 수정 성공 메시지
-        const modifiedStartDate = new Date(start);
-        const modifiedEndDate = new Date(end);
+        const modifiedStartDate = new Date(startUTC);
+        const modifiedEndDate = new Date(endUTC);
         const dateStr = modifiedStartDate.toLocaleDateString('ko-KR');
-        const timeStr = allDay ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+        const timeStr = allDayCheckbox.checked ? '종일' : `${modifiedStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${modifiedEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
         alert(`예약이 성공적으로 수정되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
       } else {
         // 신규 예약
@@ -1264,12 +1282,12 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           // 반복 예약 생성
-          const success = await createRepeatReservations(start, end, repeatEndDate, name, department, destination, purpose, allDay, repeatTypeValue);
+          const success = await createRepeatReservations(startUTC, endUTC, repeatEndDate, name, department, destination, purpose, allDayCheckbox.checked, repeatTypeValue);
           if (!success) return;
           
           // 반복 예약 성공 메시지
-          const repeatStartDate = new Date(start);
-          const repeatEndDateForMessage = new Date(end);
+          const repeatStartDate = new Date(startUTC);
+          const repeatEndDateForMessage = new Date(endUTC);
           const repeatTypeText = {
             'daily': '매일',
             'weekly': '매주',
@@ -1283,8 +1301,8 @@ document.addEventListener('DOMContentLoaded', function() {
           const snapshot = await db.collection('reservations').get();
           const conflicts = [];
           
-          const reservationStart = new Date(start);
-          const reservationEnd = new Date(end);
+          const reservationStart = new Date(startUTC);
+          const reservationEnd = new Date(endUTC);
           
           snapshot.docs.forEach(doc => {
             const r = doc.data();
@@ -1295,7 +1313,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const timeOverlap = reservationStart < existingEnd && reservationEnd > existingStart;
             
             // 종일 예약과 시간 예약은 겹치지 않음
-            const allDayConflict = allDay === !!r.allDay;
+            const allDayConflict = allDayCheckbox.checked === !!r.allDay;
             
             if (timeOverlap && allDayConflict) {
               const conflictDate = new Date(r.start);
@@ -1314,14 +1332,14 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           
           await db.collection('reservations').add({
-            start, end, name, department, destination, purpose, email: currentUser.email, allDay
+            start: startUTC, end: endUTC, name, department, destination, purpose, email: currentUser.email, allDay: allDayCheckbox.checked
           });
           
           // 단일 예약 성공 메시지
-          const singleStartDate = new Date(start);
-          const singleEndDate = new Date(end);
+          const singleStartDate = new Date(startUTC);
+          const singleEndDate = new Date(endUTC);
           const dateStr = singleStartDate.toLocaleDateString('ko-KR');
-          const timeStr = allDay ? '종일' : `${singleStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${singleEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+          const timeStr = allDayCheckbox.checked ? '종일' : `${singleStartDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${singleEndDate.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
           alert(`예약이 성공적으로 등록되었습니다!\n\n📅 ${dateStr}\n⏰ ${timeStr}\n👤 ${name}\n🏢 ${department}\n📍 ${destination}`);
         }
       }
