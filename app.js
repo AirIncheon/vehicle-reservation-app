@@ -99,6 +99,7 @@ function setupAllDayCheckbox() {
       if (endGroup) {
         endGroup.style.display = 'none';
         endInput.value = '';
+        endInput.required = false; // required 해제
       }
       // 오늘 날짜로 초기화
       const today = new Date();
@@ -109,6 +110,7 @@ function setupAllDayCheckbox() {
       if (endGroup) {
         endGroup.style.display = '';
         endInput.value = '';
+        endInput.required = true; // required 복원
       }
       // 종일 예약 해제 시, 예약 원본(UTC)에서 KST로 변환한 날짜를 기준으로 00:00, 23:59로 세팅
       if (window._lastEventObj) {
