@@ -427,7 +427,7 @@ function loadReservations() {
             return {
               html: `<div class='fc-event-custom ${alldayClass}'>
                 <div style='font-size:0.85em; color:#1976d2;'>${arg.event.allDay ? '종일' : startTime + (endTime ? `~${endTime}` : '')}</div>
-                <div style='font-weight:bold; font-size:1em;'>${name}${destination ? ` (${destination})` : ''}</div>
+                <div style='font-weight:bold; font-size:1em; color:#222;'>${name}${destination ? ` (${destination})` : ''}</div>
               </div>`
             };
           } catch (error) {
@@ -569,6 +569,14 @@ function showEventModal(html, eventObj) {
       };
     }
   }, 100);
+  // 알림 메시지 시간 표시 보정
+  if (eventObj && eventObj.start && eventObj.end) {
+    const startKST = toKST(new Date(eventObj.start));
+    const endKST = toKST(new Date(eventObj.end));
+    const dateStr = startKST.toLocaleDateString('ko-KR');
+    const timeStr = eventObj.allDay ? '종일' : `${startKST.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})} ~ ${endKST.toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit'})}`;
+    // html 메시지 내 시간 부분을 위 값으로 대체(필요시)
+  }
 }
 
 // UTC→KST 변환
