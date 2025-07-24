@@ -604,6 +604,14 @@ function parseKSTDateTime(inputValue) {
   return new Date(inputValue + ':00+09:00');
 }
 
+// eventObj.start, end가 문자열이든 Date 객체든 항상 input value로 변환
+function toInputValue(val) {
+  if (val instanceof Date) {
+    return val.toISOString().slice(0, 16);
+  }
+  return new Date(val).toISOString().slice(0, 16);
+}
+
 // 수정 폼에 데이터 채우기
 function populateEditForm(eventObj) {
   if (!allDayCheckbox || !startInput || !endInput) return;
@@ -617,15 +625,20 @@ function populateEditForm(eventObj) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
-    startInput.value = eventObj.start.slice(0, 10);
+    // 날짜만 추출
+    if (eventObj.start instanceof Date) {
+      startInput.value = eventObj.start.toISOString().slice(0, 10);
+    } else {
+      startInput.value = new Date(eventObj.start).toISOString().slice(0, 10);
+    }
   } else {
     startInput.type = 'datetime-local';
     if (endGroup) {
       endGroup.style.display = '';
       endInput.value = '';
     }
-    startInput.value = eventObj.start.slice(0, 16);
-    endInput.value = eventObj.end.slice(0, 16);
+    startInput.value = toInputValue(eventObj.start);
+    endInput.value = toInputValue(eventObj.end);
   }
   
   // 나머지 필드 설정
