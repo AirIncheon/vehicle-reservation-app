@@ -611,27 +611,21 @@ function populateEditForm(eventObj) {
   const isAllDay = eventObj.allDay;
   const endGroup = document.getElementById('end-group');
   allDayCheckbox.checked = isAllDay;
-  const utcStart = new Date(eventObj.start);
-  const utcEnd = new Date(eventObj.end);
   if (isAllDay) {
     startInput.type = 'date';
     if (endGroup) {
       endGroup.style.display = 'none';
       endInput.value = '';
     }
-    // UTC→KST 변환 후 yyyy-mm-dd로 변환
-    const startDateKST = toKST(utcStart);
-    startInput.value = formatDate(startDateKST);
+    startInput.value = eventObj.start.slice(0, 10);
   } else {
     startInput.type = 'datetime-local';
     if (endGroup) {
       endGroup.style.display = '';
       endInput.value = '';
     }
-    const startDateKST = toKST(utcStart);
-    const endDateKST = toKST(utcEnd);
-    startInput.value = startDateKST.toISOString().slice(0, 16);
-    endInput.value = endDateKST.toISOString().slice(0, 16);
+    startInput.value = eventObj.start.slice(0, 16);
+    endInput.value = eventObj.end.slice(0, 16);
   }
   
   // 나머지 필드 설정
@@ -1096,16 +1090,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const allDay = allDayCheckbox.checked;
     let startUTC, endUTC;
     if (allDay) {
-      const startKST = new Date(startInput.value + 'T00:00:00+09:00');
-      const endKST = new Date(startInput.value + 'T23:59:59+09:00');
-      startUTC = toUTC(startKST).toISOString();
-      endUTC = toUTC(endKST).toISOString();
+      // 저장 시: 입력값을 변환 없이 그대로 저장 (KST 기준)
+      startUTC = startInput.value + 'T00:00:00';
+      endUTC = startInput.value + 'T23:59:59';
     } else {
-      // 일반 예약: 입력값을 KST로 해석 후 UTC로 변환하여 저장
-      const startKST = parseKSTDateTime(startInput.value);
-      const endKST = parseKSTDateTime(endInput.value);
-      startUTC = toUTC(startKST).toISOString();
-      endUTC = toUTC(endKST).toISOString();
+      // 일반 예약: 입력값을 그대로 저장
+      startUTC = startInput.value + ':00';
+      endUTC = endInput.value + ':00';
     }
     
     const name = document.getElementById('name').value;
@@ -1122,8 +1113,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 날짜/시간 유효성 검증 (KST 기준)
-    const startDate = new Date(startInput.value); // KST 기준
-    const endDate = new Date(endInput.value);
+    const startDate = new Date(startUTC); // KST 기준
+    const endDate = new Date(endUTC);
     const now = new Date();
     const todayKST = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0); // 로컬 타임존 오늘 00:00
     if (startDate < todayKST) {
