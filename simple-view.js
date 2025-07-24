@@ -77,16 +77,19 @@ function createReservationHTML(reservation) {
   }
 }
 
-// KST 기준 오늘/내일 00:00~23:59를 UTC로 변환하는 함수 추가
+// KST 기준 오늘/내일 00:00~23:59를 반환 (UTC 변환 없이)
 function getKSTDateRange(offsetDay = 0) {
   const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  now.setDate(now.getDate() + offsetDay);
-  const startUTC = new Date(now.getTime() - 9 * 60 * 60 * 1000);
-  const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
+  // 현재 KST로 변환
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  kstNow.setHours(0, 0, 0, 0);
+  kstNow.setDate(kstNow.getDate() + offsetDay);
+  const startKST = new Date(kstNow);
+  const endKST = new Date(kstNow);
+  endKST.setHours(23, 59, 59, 999);
   return {
-    start: startUTC,
-    end: endUTC
+    start: startKST,
+    end: endKST
   };
 }
 
