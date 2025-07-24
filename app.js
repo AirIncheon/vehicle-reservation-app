@@ -681,6 +681,8 @@ function populateEditForm(eventObj) {
     if (repeatOptions) repeatOptions.style.display = 'none';
     if (repeatCheckbox) repeatCheckbox.checked = false;
   }
+  // 폼이 숨겨져 있다면 보이도록 강제
+  document.getElementById('reservationForm').style.display = '';
 }
 
 // 통계 업데이트
