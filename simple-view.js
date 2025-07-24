@@ -55,10 +55,9 @@ function createReservationHTML(reservation) {
       </div>
     `;
   } else {
-    // UTC ISO 문자열을 Date 객체로 만들 때, 항상 명시적으로 처리
-    // (브라우저별 파싱 차이 방지)
-    const startTime = toKST(new Date(reservation.start));
-    const endTime = toKST(new Date(reservation.end));
+    // Firestore에서 읽은 시간은 타임존 없는 KST 문자열이므로 +09:00을 붙여서 KST로 해석
+    const startTime = new Date(reservation.start + '+09:00');
+    const endTime = new Date(reservation.end + '+09:00');
     let timeRange;
     if (endTime <= startTime) {
       timeRange = `${formatKSTTime(startTime)} ~ 익일 ${formatKSTTime(endTime)}`;

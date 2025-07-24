@@ -606,10 +606,19 @@ function parseKSTDateTime(inputValue) {
 
 // eventObj.start, end가 문자열이든 Date 객체든 항상 input value로 변환
 function toInputValue(val) {
+  let date;
   if (val instanceof Date) {
-    return val.toISOString().slice(0, 16);
+    date = val;
+  } else {
+    // 타임존 없는 문자열이면 +09:00 붙여서 KST로 해석
+    date = new Date(val.includes('+09:00') ? val : val.replace(' ', 'T') + '+09:00');
   }
-  return new Date(val).toISOString().slice(0, 16);
+  // 'YYYY-MM-DDTHH:mm' 형식 반환
+  return date.getFullYear() + '-' +
+         String(date.getMonth() + 1).padStart(2, '0') + '-' +
+         String(date.getDate()).padStart(2, '0') + 'T' +
+         String(date.getHours()).padStart(2, '0') + ':' +
+         String(date.getMinutes()).padStart(2, '0');
 }
 
 // 수정 폼에 데이터 채우기
