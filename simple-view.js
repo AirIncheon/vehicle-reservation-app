@@ -103,9 +103,9 @@ async function loadReservations() {
     const tomorrowReservations = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      // 항상 +09:00을 붙여서 KST로 해석
-      const startKST = new Date(data.start + '+09:00');
-      const endKST = new Date(data.end + '+09:00');
+      // +09:00을 붙이지 않고, new Date(data.start)만 사용
+      const startKST = new Date(data.start);
+      const endKST = new Date(data.end);
       if (data.allDay) {
         if (startKST <= todayRange.end && endKST >= todayRange.start) {
           todayReservations.push({ id: doc.id, ...data });
