@@ -103,22 +103,21 @@ async function loadReservations() {
     const tomorrowReservations = [];
     snapshot.forEach(doc => {
       const data = doc.data();
-      const startUTC = new Date(data.start);
-      const endUTC = new Date(data.end);
+      // 항상 +09:00을 붙여서 KST로 해석
+      const startKST = new Date(data.start + '+09:00');
+      const endKST = new Date(data.end + '+09:00');
       if (data.allDay) {
-        // allDay 예약: 오늘/내일 KST 범위와 겹치는지 체크
-        if (startUTC <= todayRange.end && endUTC >= todayRange.start) {
+        if (startKST <= todayRange.end && endKST >= todayRange.start) {
           todayReservations.push({ id: doc.id, ...data });
         }
-        if (startUTC <= tomorrowRange.end && endUTC >= tomorrowRange.start) {
+        if (startKST <= tomorrowRange.end && endKST >= tomorrowRange.start) {
           tomorrowReservations.push({ id: doc.id, ...data });
         }
       } else {
-        // 일반 예약: 시작이 오늘/내일 KST 범위 내에 있는지 체크
-        if (startUTC >= todayRange.start && startUTC <= todayRange.end) {
+        if (startKST >= todayRange.start && startKST <= todayRange.end) {
           todayReservations.push({ id: doc.id, ...data });
         }
-        if (startUTC >= tomorrowRange.start && startUTC <= tomorrowRange.end) {
+        if (startKST >= tomorrowRange.start && startKST <= tomorrowRange.end) {
           tomorrowReservations.push({ id: doc.id, ...data });
         }
       }
